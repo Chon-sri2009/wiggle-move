@@ -95,6 +95,11 @@ class PlayerNameNotifier extends Notifier<String?> {
     state = name;
     await ref.read(sharedPrefsProvider).setString(_nameKey, name);
   }
+
+  Future<void> clear() async {
+    state = null;
+    await ref.read(sharedPrefsProvider).remove(_nameKey);
+  }
 }
 
 final playerNameProvider = NotifierProvider<PlayerNameNotifier, String?>(

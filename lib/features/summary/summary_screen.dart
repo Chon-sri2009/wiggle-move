@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme.dart';
 import '../scoring/move_scorer.dart';
 import '../workout/workout_session.dart';
 
@@ -28,6 +29,7 @@ class SummaryScreen extends StatelessWidget {
                   '$total',
                   style: theme.textTheme.displayLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppColors.accent,
                   ),
                 ),
                 Text(_grade(total), style: theme.textTheme.titleLarge),

@@ -1,40 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../home/player_name.dart';
+import '../../app/theme.dart';
 import 'trainer.dart';
 
-class TrainerScreen extends ConsumerWidget {
+class TrainerScreen extends StatelessWidget {
   const TrainerScreen({super.key, required this.trainer});
   final Trainer trainer;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(trainer.name)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         children: [
-          Text(trainer.style, style: theme.textTheme.titleMedium),
+          Text(
+            trainer.style,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: AppColors.accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
           for (final routine in trainer.routines)
             Card(
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
-                title: Text(routine.name, style: theme.textTheme.titleLarge),
+                title: Text(
+                  routine.name,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 subtitle: Text(
                   '${routine.level} · ${routine.moves.length} moves · '
                   '${(routine.durationMs / 1000).round()}s',
                 ),
-                trailing: const Icon(Icons.play_circle_fill, size: 36),
-                onTap: () async {
-                  final name = await ensurePlayerName(context, ref);
-                  if (name != null && context.mounted) {
-                    context.push('/workout/${routine.id}');
-                  }
-                },
+                trailing: const Icon(
+                  Icons.play_circle_fill,
+                  size: 36,
+                  color: AppColors.secondary,
+                ),
+                onTap: () => context.push('/workout/${routine.id}'),
               ),
             ),
         ],

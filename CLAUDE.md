@@ -42,4 +42,6 @@ Branch from `main` → `feature/<short-name>` / `fix/<short-name>`; PR into `mai
 ## Status
 First playable version, **not yet run on a device** (no Android SDK on the machine it was written on). Implemented: trainer list → routines → camera workout with ML Kit scoring → summary with per-move feedback → local leaderboard. Scoring + session logic is unit-tested; the camera/ML Kit path (`lib/features/workout/pose_service.dart`, `workout_screen.dart`) is untested until someone runs it on a phone.
 
-Known gaps: leaderboard is per-device (Supabase not wired); no trainer video; target angles in `trainer_data.dart` are uncalibrated estimates; no auth (player name only); no Figma styling yet.
+Figma applied: theme/palette in `lib/app/theme.dart`, login/sign-up (`features/auth`), 4-step personalization (`features/profile`), navy-header home. Router redirects: signed out → `/login`; not onboarded → `/personalize`.
+
+Known gaps: **login/sign-up are UI only** (they just store a display name on the device; no real accounts until Supabase is wired); leaderboard is per-device; no trainer video; target angles in `trainer_data.dart` are uncalibrated estimates; logo is a placeholder icon + text (export the rabbit asset from Figma); font not matched to Figma; Figma has no workout/summary/leaderboard frames so those use the theme only.

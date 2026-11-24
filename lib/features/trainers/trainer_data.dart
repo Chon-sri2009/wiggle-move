@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../scoring/move_scorer.dart';
 import '../scoring/pose_math.dart';
 import 'trainer.dart';
@@ -80,7 +80,7 @@ final trainers = <Trainer>[
     id: 'mia',
     name: 'Coach Mia',
     style: 'Pop & disco',
-    color: Colors.pink,
+    color: AppColors.accent,
     routines: [
       Routine(
         id: 'pop-starter',
@@ -116,7 +116,7 @@ final trainers = <Trainer>[
     id: 'jay',
     name: 'Coach Jay',
     style: 'Cardio burn',
-    color: Colors.teal,
+    color: AppColors.secondary,
     routines: [
       Routine(
         id: 'cardio-burn',

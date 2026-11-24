@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../features/auth/auth_screens.dart';
+import '../features/leaderboard/leaderboard_store.dart';
+import '../features/profile/personalize_screen.dart';
+import '../features/profile/profile_store.dart';
+import 'theme.dart';
 
 import '../features/home/home_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
@@ -19,8 +26,23 @@ class _NotFound extends StatelessWidget {
   );
 }
 
-GoRouter _buildRouter() => GoRouter(
+const _authPaths = {'/login', '/signup'};
+
+GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
+  refreshListenable: refresh,
+  redirect: (context, state) {
+    final signedIn = ref.read(playerNameProvider) != null;
+    final onboarded = ref.read(profileProvider).onboarded;
+    final loc = state.matchedLocation;
+    if (!signedIn) return _authPaths.contains(loc) ? null : '/login';
+    if (_authPaths.contains(loc)) return onboarded ? '/' : '/personalize';
+    if (!onboarded && loc != '/personalize') return '/personalize';
+    return null;
+  },
   routes: [
+    GoRoute(path: '/login', builder: (c, s) => const AuthScreen(signUp: false)),
+    GoRoute(path: '/signup', builder: (c, s) => const AuthScreen(signUp: true)),
+    GoRoute(path: '/personalize', builder: (c, s) => const PersonalizeScreen()),
     GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
     GoRoute(
       path: '/trainer/:id',
@@ -56,30 +78,32 @@ GoRouter _buildRouter() => GoRouter(
   ],
 );
 
-class WiggleMoveApp extends StatefulWidget {
+class WiggleMoveApp extends ConsumerStatefulWidget {
   const WiggleMoveApp({super.key});
 
   @override
-  State<WiggleMoveApp> createState() => _WiggleMoveAppState();
+  ConsumerState<WiggleMoveApp> createState() => _WiggleMoveAppState();
 }
 
-class _WiggleMoveAppState extends State<WiggleMoveApp> {
-  final _router = _buildRouter();
+class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp> {
+  final _refresh = ValueNotifier(0);
+  late final GoRouter _router = _buildRouter(ref, _refresh);
 
   @override
   void dispose() {
     _router.dispose();
+    _refresh.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Re-run route redirects when sign-in or onboarding state changes.
+    ref.listen(playerNameProvider, (_, _) => _refresh.value++);
+    ref.listen(profileProvider, (_, _) => _refresh.value++);
     return MaterialApp.router(
       title: 'Wiggle Move',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: buildTheme(),
       routerConfig: _router,
     );
   }
