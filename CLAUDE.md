@@ -24,7 +24,7 @@ dart format lib test
 Feature-first under `lib/`:
 - `lib/main.dart` — entry, wraps app in `ProviderScope`
 - `lib/app/` — `MaterialApp.router`, theme, routes
-- `lib/features/<feature>/` — one folder per feature (home, trainers, workout, summary, leaderboard, auth). Keep UI, providers and data code for a feature together.
+- `lib/features/<feature>/` — one folder per feature: `home`, `trainers` (models + seed data), `scoring` (pure angle math + scorer), `workout` (session, ML Kit service, camera screen), `summary`, `leaderboard` (local store). Keep UI, providers and data code for a feature together.
 - Code shared by 2+ features goes in `lib/shared/` (create when first needed).
 - Tests mirror `lib/` under `test/`.
 
@@ -40,4 +40,6 @@ Feature-first under `lib/`:
 Branch from `main` → `feature/<short-name>` / `fix/<short-name>`; PR into `main`; one logical change per commit, imperative subject. Details in CONTRIBUTING.
 
 ## Status
-Scaffold only: app boots to a placeholder home screen. See the roadmap in docs/PROJECT.md for what to build next.
+First playable version, **not yet run on a device** (no Android SDK on the machine it was written on). Implemented: trainer list → routines → camera workout with ML Kit scoring → summary with per-move feedback → local leaderboard. Scoring + session logic is unit-tested; the camera/ML Kit path (`lib/features/workout/pose_service.dart`, `workout_screen.dart`) is untested until someone runs it on a phone.
+
+Known gaps: leaderboard is per-device (Supabase not wired); no trainer video; target angles in `trainer_data.dart` are uncalibrated estimates; no auth (player name only); no Figma styling yet.

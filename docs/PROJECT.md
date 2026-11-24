@@ -39,14 +39,17 @@ Reference choreography (per routine) ──────────►├─► 
 These are defaults picked at project start; change them via PR that updates this section.
 
 ## 5. Roadmap
-1. **Foundation (done):** Flutter scaffold, deps, camera permissions, CI-ready analyze/test.
-2. **Pose spike:** camera preview + skeleton overlay on a real device; measure FPS/accuracy.
-3. **Scoring engine:** angle math, reference format, unit tests with recorded landmark fixtures.
-4. **Trainer + routine screens** from Figma, seeded routine data.
-5. **Workout flow:** video playback synced with scoring.
-6. **Summary screen.**
-7. **Supabase:** auth, schema, save sessions, leaderboard.
-8. **Polish:** onboarding, error/permission states, performance, store release.
+1. **Foundation (done):** Flutter scaffold, deps, camera permissions.
+2. **Scoring engine (done, unit-tested):** angle math, per-move scorer (tolerance 15°, best-half-of-frames), session timeline.
+3. **Core flow (done, untested on device):** trainers → routines → workout (camera + ML Kit, 3-2-1 countdown, live meter) → summary → local leaderboard.
+4. **Device validation (next):** run on a real phone; verify the ML Kit image conversion, FPS, and that landmarks are detected; calibrate target angles (see below).
+5. **Figma styling:** apply the design to each screen; trainer photos/avatars.
+6. **Trainer video:** play the routine video during the workout, sync move timeline to it; author reference poses from the video.
+7. **Supabase:** auth, schema, save sessions, shared leaderboard (replace `leaderboard_store.dart`), server-side score sanity checks.
+8. **Polish:** onboarding, permission states, skeleton overlay, sound/haptics, store release.
+
+### Calibration
+Target angles in `lib/features/trainers/trainer_data.dart` are estimates for a user standing front-on, whole body in frame, ~2 m from the camera. Angles are measured in the 2D image plane, so moves toward/away from the camera (squats, forward lunges) are under-measured; prefer front-plane moves or add the ML Kit z-coordinate later. To calibrate: do each pose, log the measured angles, and update the targets.
 
 ## 6. Setup for new teammates
 1. Install Flutter 3.47+ and Android Studio (Android SDK) and/or Xcode (macOS, iOS).
