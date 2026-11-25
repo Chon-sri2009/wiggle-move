@@ -1,57 +1,42 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/prefs.dart';
+import '../../shared/backend/auth_providers.dart';
+import '../../shared/backend/profile.dart';
+import '../../shared/backend/profile_providers.dart';
 
-const _onboardedKey = 'onboarded';
-const _goalsKey = 'profile_goals';
-const _stylesKey = 'profile_styles';
-const _levelKey = 'profile_level';
-
-/// Answers from the personalization flow.
-class Profile {
-  const Profile({
-    this.goals = const [],
-    this.styles = const [],
-    this.level,
-    this.onboarded = false,
-  });
-  final List<String> goals;
-  final List<String> styles;
-  final String? level;
-  final bool onboarded;
-}
-
-class ProfileNotifier extends Notifier<Profile> {
+/// The signed-in user's profile. Reloads whenever the user id changes and is
+/// a default (not onboarded) profile while signed out, so one account never
+/// sees another's answers.
+class ProfileNotifier extends AsyncNotifier<Profile> {
   @override
-  Profile build() {
-    final prefs = ref.read(sharedPrefsProvider);
-    return Profile(
-      goals: prefs.getStringList(_goalsKey) ?? const [],
-      styles: prefs.getStringList(_stylesKey) ?? const [],
-      level: prefs.getString(_levelKey),
-      onboarded: prefs.getBool(_onboardedKey) ?? false,
-    );
+  FutureOr<Profile> build() {
+    final uid = ref.watch(authUserProvider.select((u) => u?.id));
+    if (uid == null) return const Profile();
+    return ref.watch(profileRepositoryProvider).load();
   }
 
+  /// Saves the answers, then marks the user onboarded. Throws
+  /// `RepositoryFailure` and leaves the state unchanged if the save fails.
   Future<void> complete({
     required List<String> goals,
     required List<String> styles,
     required String level,
   }) async {
-    final prefs = ref.read(sharedPrefsProvider);
-    await prefs.setStringList(_goalsKey, goals);
-    await prefs.setStringList(_stylesKey, styles);
-    await prefs.setString(_levelKey, level);
-    await prefs.setBool(_onboardedKey, true);
-    state = Profile(
+    final profile = Profile(
       goals: goals,
       styles: styles,
       level: level,
       onboarded: true,
     );
+    await ref.read(profileRepositoryProvider).save(profile);
+    state = AsyncData(profile);
   }
 }
 
-final profileProvider = NotifierProvider<ProfileNotifier, Profile>(
+final profileProvider = AsyncNotifierProvider<ProfileNotifier, Profile>(
   ProfileNotifier.new,
+  // Failures are shown with a Retry button instead of retried silently.
+  retry: (_, _) => null,
 );

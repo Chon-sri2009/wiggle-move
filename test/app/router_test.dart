@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,19 +8,49 @@ import 'package:wiggle_move/app/app.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
+import 'package:wiggle_move/shared/backend/profile.dart';
+import 'package:wiggle_move/shared/backend/profile_providers.dart';
+import 'package:wiggle_move/shared/backend/profile_repository.dart';
 
 import '../support/fakes.dart';
 
-Future<Widget> _app(FakeAuthRepository auth, {bool onboarded = false}) async {
-  SharedPreferences.setMockInitialValues({'onboarded': onboarded});
+Future<Widget> _app(
+  FakeAuthRepository auth, {
+  bool onboarded = false,
+  FakeProfileRepository? profiles,
+}) async {
+  SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
+  final repo =
+      profiles ??
+      FakeProfileRepository(auth, {
+        if (onboarded) 'u1': FakeProfileRepository.onboarded,
+      });
   return ProviderScope(
     overrides: [
       sharedPrefsProvider.overrideWithValue(prefs),
       authRepositoryProvider.overrideWithValue(auth),
+      profileRepositoryProvider.overrideWithValue(repo),
     ],
     child: const WiggleMoveApp(),
   );
+}
+
+Future<void> _personalize(WidgetTester tester) async {
+  await tester.tap(find.text('Start'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Burn Calories'));
+  await tester.pump();
+  await tester.tap(find.text('Next'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Cardio'));
+  await tester.pump();
+  await tester.tap(find.text('Next'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Beginner'));
+  await tester.pump();
+  await tester.tap(find.text('Create My Workout Plan'));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _fillLogin(WidgetTester tester) async {
@@ -129,5 +161,119 @@ void main() {
     await tester.pumpAndSettle();
     expect(auth.resetRequests, ['ann@x.com']);
     expect(find.textContaining('If an account exists'), findsOneWidget);
+  });
+
+  group('server profile (WM-21)', () {
+    testWidgets('onboarded on the server skips personalization', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      await tester.pumpWidget(await _app(auth, onboarded: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Personalization'), findsNothing);
+    });
+
+    testWidgets('while the profile loads it shows a spinner, not personalize', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      final repo = FakeProfileRepository(auth, {
+        'u1': FakeProfileRepository.onboarded,
+      })..loadGate = Completer();
+      await tester.pumpWidget(await _app(auth, profiles: repo));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Personalization'), findsNothing);
+      expect(find.text('Hi, Ann'), findsNothing);
+
+      repo.loadGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Hi, Ann'), findsOneWidget);
+    });
+
+    testWidgets('load failure shows the message and retry recovers', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      final repo = FakeProfileRepository(auth, {
+        'u1': FakeProfileRepository.onboarded,
+      })..failLoad = const RepositoryFailure(RepositoryFailure.network);
+      await tester.pumpWidget(await _app(auth, profiles: repo));
+      await tester.pumpAndSettle();
+      expect(find.text(RepositoryFailure.network), findsOneWidget);
+      expect(find.text('Personalization'), findsNothing);
+
+      repo.failLoad = null;
+      await tester.tap(find.widgetWithText(FilledButton, 'Retry'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hi, Ann'), findsOneWidget);
+    });
+
+    testWidgets('completing personalization saves to the repository', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      final repo = FakeProfileRepository(auth);
+      await tester.pumpWidget(await _app(auth, profiles: repo));
+      await tester.pumpAndSettle();
+      await _personalize(tester);
+      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(
+        repo.profiles['u1'],
+        const Profile(
+          goals: ['Burn Calories'],
+          styles: ['Cardio'],
+          level: 'Beginner',
+          onboarded: true,
+        ),
+      );
+    });
+
+    testWidgets('save failure keeps the user on the step with an error', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      final repo = FakeProfileRepository(auth)
+        ..failSave = const RepositoryFailure(RepositoryFailure.network);
+      await tester.pumpWidget(await _app(auth, profiles: repo));
+      await tester.pumpAndSettle();
+      await _personalize(tester);
+      expect(find.text(RepositoryFailure.network), findsOneWidget);
+      expect(find.text('Experience Level'), findsOneWidget);
+      expect(find.text('Hi, Ann'), findsNothing);
+      expect(repo.profiles, isEmpty);
+    });
+
+    testWidgets('a different user does not inherit the previous profile', (
+      tester,
+    ) async {
+      final auth = FakeAuthRepository(FakeAuthRepository.ann);
+      final repo = FakeProfileRepository(auth, {
+        'u1': FakeProfileRepository.onboarded,
+      });
+      await tester.pumpWidget(await _app(auth, profiles: repo));
+      await tester.pumpAndSettle();
+      expect(find.text('Hi, Ann'), findsOneWidget);
+
+      auth.emit(null);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, 'Login'), findsOneWidget);
+
+      // Bob's load is held: nothing of Ann's may be shown meanwhile.
+      repo.loadGate = Completer();
+      auth.emit(
+        const AppUser(id: 'u2', email: 'bob@x.com', displayName: 'Bob'),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Hi, Bob'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      repo.loadGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Personalization'), findsOneWidget);
+    });
   });
 }

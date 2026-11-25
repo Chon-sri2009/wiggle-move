@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/backend/profile_repository.dart';
+import '../../shared/widgets/app_snackbar.dart';
 import '../../shared/widgets/primary_button.dart';
 import 'profile_store.dart';
 
@@ -48,6 +50,7 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
   final _goalSel = <String>{};
   final _styleSel = <String>{};
   String? _level;
+  bool _saving = false;
 
   bool get _canContinue => switch (_step) {
     1 => _goalSel.isNotEmpty,
@@ -61,13 +64,23 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
       setState(() => _step++);
       return;
     }
-    await ref
-        .read(profileProvider.notifier)
-        .complete(
-          goals: _goalSel.toList(),
-          styles: _styleSel.toList(),
-          level: _level!,
-        );
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(profileProvider.notifier)
+          .complete(
+            goals: _goalSel.toList(),
+            styles: _styleSel.toList(),
+            level: _level!,
+          );
+    } on RepositoryFailure catch (e) {
+      // Stay on this step so the user can try again.
+      if (mounted) {
+        setState(() => _saving = false);
+        showAppSnackBar(context, e.message, isError: true);
+      }
+      return;
+    }
     if (mounted) context.go('/');
   }
 
@@ -149,6 +162,7 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
                 Center(
                   child: PrimaryButton(
                     onPressed: _canContinue ? _next : null,
+                    loading: _saving,
                     label: switch (_step) {
                       0 => 'Start',
                       3 => 'Create My Workout Plan',

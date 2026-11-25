@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
+import 'package:wiggle_move/shared/backend/profile.dart';
+import 'package:wiggle_move/shared/backend/profile_repository.dart';
 
 /// In-memory [AuthRepository] for tests. Set [failWith] to make the next
 /// calls throw; inspect [resetRequests] for password-reset calls.
@@ -57,5 +59,47 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> sendPasswordReset(String email) async {
     _check();
     resetRequests.add(email);
+  }
+}
+
+/// In-memory [ProfileRepository] keyed by the signed-in user of [auth], like
+/// the server's own-row RLS. Set [loadGate] to hold loads until completed;
+/// set [failLoad] / [failSave] to make calls throw.
+class FakeProfileRepository implements ProfileRepository {
+  FakeProfileRepository(this.auth, [Map<String, Profile>? profiles])
+    : profiles = profiles ?? {};
+
+  static const onboarded = Profile(
+    goals: ['Burn Calories'],
+    styles: ['Cardio'],
+    level: 'Beginner',
+    onboarded: true,
+  );
+
+  final AuthRepository auth;
+  final Map<String, Profile> profiles;
+  Completer<void>? loadGate;
+  RepositoryFailure? failLoad;
+  RepositoryFailure? failSave;
+  int loads = 0;
+
+  String get _uid => auth.currentUser!.id;
+
+  @override
+  Future<Profile> load() async {
+    loads++;
+    final uid = _uid;
+    final gate = loadGate;
+    if (gate != null) await gate.future;
+    final f = failLoad;
+    if (f != null) throw f;
+    return profiles[uid] ?? const Profile();
+  }
+
+  @override
+  Future<void> save(Profile profile) async {
+    final f = failSave;
+    if (f != null) throw f;
+    profiles[_uid] = profile;
   }
 }

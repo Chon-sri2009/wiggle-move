@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_screens.dart';
 import '../features/profile/personalize_screen.dart';
+import '../features/profile/profile_loading_screen.dart';
 import '../features/profile/profile_store.dart';
 import '../shared/backend/auth_providers.dart';
+import '../shared/backend/profile.dart';
 import 'theme.dart';
 
 import '../features/home/home_screen.dart';
@@ -27,19 +29,42 @@ class _NotFound extends StatelessWidget {
 }
 
 const _authPaths = {'/login', '/signup'};
+const _loadingPath = '/loading';
+
+/// Where the router sends [location], or null to stay. Signed-out users go
+/// to login; while the profile is loading (or failed to load) a signed-in
+/// user waits on [_loadingPath] so onboarding is decided by the server
+/// answer, not a default; users who are not onboarded go to /personalize.
+String? appRedirect({
+  required bool signedIn,
+  required AsyncValue<Profile> profile,
+  required String location,
+}) {
+  if (!signedIn) return _authPaths.contains(location) ? null : '/login';
+  // isLoading also covers a reload that still carries the previous value.
+  if (profile.isLoading || profile.hasError) {
+    return location == _loadingPath ? null : _loadingPath;
+  }
+  final onboarded = profile.requireValue.onboarded;
+  if (_authPaths.contains(location) || location == _loadingPath) {
+    return onboarded ? '/' : '/personalize';
+  }
+  if (!onboarded && location != '/personalize') return '/personalize';
+  return null;
+}
 
 GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
   refreshListenable: refresh,
-  redirect: (context, state) {
-    final signedIn = ref.read(authUserProvider) != null;
-    final onboarded = ref.read(profileProvider).onboarded;
-    final loc = state.matchedLocation;
-    if (!signedIn) return _authPaths.contains(loc) ? null : '/login';
-    if (_authPaths.contains(loc)) return onboarded ? '/' : '/personalize';
-    if (!onboarded && loc != '/personalize') return '/personalize';
-    return null;
-  },
+  redirect: (context, state) => appRedirect(
+    signedIn: ref.read(authUserProvider) != null,
+    profile: ref.read(profileProvider),
+    location: state.matchedLocation,
+  ),
   routes: [
+    GoRoute(
+      path: _loadingPath,
+      builder: (c, s) => const ProfileLoadingScreen(),
+    ),
     GoRoute(path: '/login', builder: (c, s) => const AuthScreen(signUp: false)),
     GoRoute(path: '/signup', builder: (c, s) => const AuthScreen(signUp: true)),
     GoRoute(path: '/personalize', builder: (c, s) => const PersonalizeScreen()),

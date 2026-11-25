@@ -7,6 +7,8 @@ import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_profile_repository.dart';
+import 'package:wiggle_move/shared/backend/profile_providers.dart';
 
 Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
   SharedPreferences.setMockInitialValues(prefs);
@@ -16,6 +18,9 @@ Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
       sharedPrefsProvider.overrideWithValue(instance),
       // The WM_OFFLINE implementation: exercises the local end-to-end path.
       authRepositoryProvider.overrideWithValue(OfflineAuthRepository(instance)),
+      profileRepositoryProvider.overrideWithValue(
+        OfflineProfileRepository(instance),
+      ),
     ],
     child: const WiggleMoveApp(),
   );
