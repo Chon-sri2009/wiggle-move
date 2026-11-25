@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/widgets/async_states.dart';
-import '../trainers/trainer_data.dart';
+import '../../shared/backend/trainer_data.dart';
 import 'leaderboard_store.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
@@ -21,7 +21,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final entries = ref.watch(leaderboardProvider);
     final me = ref.watch(authUserProvider)?.displayName;
     final ranked = rankEntries(entries, routineId: _routineId);
-    final routines = trainers.expand((t) => t.routines).toList();
+    final routines = builtInTrainers.expand((t) => t.routines).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Leaderboard')),

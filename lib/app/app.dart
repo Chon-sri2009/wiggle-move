@@ -13,7 +13,7 @@ import 'theme.dart';
 import '../features/home/home_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
 import '../features/summary/summary_screen.dart';
-import '../features/trainers/trainer_data.dart';
+import '../shared/backend/trainer_data.dart';
 import '../features/trainers/trainer_screen.dart';
 import '../features/workout/workout_screen.dart';
 import '../features/workout/workout_session.dart';

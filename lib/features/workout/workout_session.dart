@@ -1,6 +1,6 @@
 import '../scoring/move_scorer.dart';
-import '../scoring/pose_math.dart';
-import '../trainers/trainer.dart';
+import '../../shared/pose/pose_math.dart';
+import '../../shared/backend/content_models.dart';
 
 class MoveOutcome {
   const MoveOutcome(this.move, this.result);

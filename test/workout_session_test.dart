@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wiggle_move/features/scoring/pose_math.dart';
-import 'package:wiggle_move/features/trainers/trainer_data.dart';
+import 'package:wiggle_move/shared/pose/pose_math.dart';
+import 'package:wiggle_move/shared/backend/trainer_data.dart';
 import 'package:wiggle_move/features/workout/workout_session.dart';
 
 void main() {
@@ -29,9 +29,12 @@ void main() {
   });
 
   test('seed data references only valid joints and unique routine ids', () {
-    final ids = trainers.expand((t) => t.routines).map((r) => r.id).toList();
+    final ids = builtInTrainers
+        .expand((t) => t.routines)
+        .map((r) => r.id)
+        .toList();
     expect(ids.toSet().length, ids.length);
-    for (final r in trainers.expand((t) => t.routines)) {
+    for (final r in builtInTrainers.expand((t) => t.routines)) {
       for (final m in r.moves) {
         expect(m.target.angles, isNotEmpty);
         expect(m.durationMs, greaterThan(0));

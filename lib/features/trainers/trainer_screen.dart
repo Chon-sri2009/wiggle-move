@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../shared/widgets/app_card.dart';
-import 'trainer.dart';
+import '../../shared/backend/content_models.dart';
 
 class TrainerScreen extends StatelessWidget {
   const TrainerScreen({super.key, required this.trainer});

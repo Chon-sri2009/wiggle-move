@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
+import 'package:wiggle_move/shared/backend/content_models.dart';
+import 'package:wiggle_move/shared/backend/content_repository.dart';
 import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
+import 'package:wiggle_move/shared/backend/trainer_data.dart';
 
 /// In-memory [AuthRepository] for tests. Set [failWith] to make the next
 /// calls throw; inspect [resetRequests] for password-reset calls.
@@ -101,5 +104,27 @@ class FakeProfileRepository implements ProfileRepository {
     final f = failSave;
     if (f != null) throw f;
     profiles[_uid] = profile;
+  }
+}
+
+/// In-memory [ContentRepository]. Set [gate] to hold fetches until completed;
+/// set [failWith] to make fetches throw.
+class FakeContentRepository implements ContentRepository {
+  FakeContentRepository([List<Trainer>? trainers])
+    : trainers = trainers ?? builtInTrainers;
+
+  List<Trainer> trainers;
+  Completer<void>? gate;
+  Object? failWith;
+  int fetches = 0;
+
+  @override
+  Future<List<Trainer>> fetchTrainers() async {
+    fetches++;
+    final g = gate;
+    if (g != null) await g.future;
+    final f = failWith;
+    if (f != null) throw f;
+    return trainers;
   }
 }

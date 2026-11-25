@@ -7,7 +7,7 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/backend/auth_repository.dart';
 import '../../shared/widgets/app_snackbar.dart';
-import '../trainers/trainer_data.dart';
+import '../../shared/backend/trainer_data.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -52,7 +52,7 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          for (final trainer in trainers)
+          for (final trainer in builtInTrainers)
             AppCard(
               clipBehavior: Clip.antiAlias,
               child: ListTile(

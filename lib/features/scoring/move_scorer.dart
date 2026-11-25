@@ -1,10 +1,4 @@
-import 'pose_math.dart';
-
-/// Target joint angles (degrees) the user should hold for a move.
-class MoveTarget {
-  const MoveTarget(this.angles);
-  final Map<Joint, double> angles;
-}
+import '../../shared/pose/pose_math.dart';
 
 class MoveResult {
   const MoveResult({

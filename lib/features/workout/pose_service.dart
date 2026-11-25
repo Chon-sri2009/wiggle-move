@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../scoring/pose_math.dart';
+import '../../shared/pose/pose_math.dart';
 
 /// True where ML Kit pose detection exists.
 bool get poseDetectionSupported =>

@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/widgets/async_states.dart';
 import '../leaderboard/leaderboard_store.dart';
-import '../trainers/trainer.dart';
+import '../../shared/backend/content_models.dart';
 import 'pose_service.dart';
 import 'workout_session.dart';
 

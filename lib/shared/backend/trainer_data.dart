@@ -1,7 +1,12 @@
-import '../../app/theme.dart';
-import '../scoring/move_scorer.dart';
-import '../scoring/pose_math.dart';
-import 'trainer.dart';
+import 'dart:ui' show Color;
+
+import '../pose/pose_math.dart';
+import 'content_models.dart';
+
+// Built-in content: what `OfflineContentRepository` serves under WM_OFFLINE
+// and the fixture tests compare against. supabase/seed.sql mirrors it; keep
+// the two in sync. Colors are AppColors.accent / AppColors.secondary as
+// literals so lib/shared does not import lib/app.
 
 // Target angles are first-pass estimates for a user standing front-on to the
 // camera. Tune them on a real device (see docs/PROJECT.md, "Calibration").
@@ -74,12 +79,12 @@ final _halfSquat = _move('Half Squat', 'Bend your knees, sit back', {
   Joint.rightKnee: 125,
 });
 
-final trainers = <Trainer>[
+final builtInTrainers = <Trainer>[
   Trainer(
     id: 'mia',
     name: 'Coach Mia',
     style: 'Pop & disco',
-    color: AppColors.accent,
+    color: const Color(0xFFFF7F3F),
     routines: [
       Routine(
         id: 'pop-starter',
@@ -115,7 +120,7 @@ final trainers = <Trainer>[
     id: 'jay',
     name: 'Coach Jay',
     style: 'Cardio burn',
-    color: AppColors.secondary,
+    color: const Color(0xFF1ADBC1),
     routines: [
       Routine(
         id: 'cardio-burn',
@@ -126,9 +131,10 @@ final trainers = <Trainer>[
     ],
   ),
 ];
-
 Trainer? trainerById(String id) =>
-    trainers.where((t) => t.id == id).firstOrNull;
+    builtInTrainers.where((t) => t.id == id).firstOrNull;
 
-Routine? routineById(String id) =>
-    trainers.expand((t) => t.routines).where((r) => r.id == id).firstOrNull;
+Routine? routineById(String id) => builtInTrainers
+    .expand((t) => t.routines)
+    .where((r) => r.id == id)
+    .firstOrNull;

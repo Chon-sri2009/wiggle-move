@@ -23,6 +23,12 @@ class Pt {
   final double y;
 }
 
+/// Target joint angles (degrees) the user should hold for a move.
+class MoveTarget {
+  const MoveTarget(this.angles);
+  final Map<Joint, double> angles;
+}
+
 enum JointKind { elbow, shoulder, hip, knee }
 
 /// A joint angle measured at [vertex] between the segments to [a] and [c].
