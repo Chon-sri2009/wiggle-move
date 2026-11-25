@@ -1,15 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/backend/sessions_providers.dart';
+import '../../shared/backend/sessions_repository.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/primary_button.dart';
 import '../scoring/move_scorer.dart';
 import '../workout/workout_session.dart';
 
-class SummaryScreen extends StatelessWidget {
-  const SummaryScreen({super.key, required this.summary});
+/// Route extra for `/summary`: the play and its upload id (client nonce),
+/// null when nothing was submitted (signed out).
+class SummaryArgs {
+  const SummaryArgs(this.summary, {this.submissionId});
   final SessionSummary summary;
+  final String? submissionId;
+}
+
+class SummaryScreen extends StatelessWidget {
+  const SummaryScreen({super.key, required this.summary, this.submissionId});
+  final SessionSummary summary;
+
+  /// Client nonce of the submitted play; its upload status is shown.
+  final String? submissionId;
+
+  static const savingText = 'Saving your score…';
+  static const savedText = 'Saved';
+  static const queuedText = "Will upload when you're back online";
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +53,7 @@ class SummaryScreen extends StatelessWidget {
                   ),
                 ),
                 Text(_grade(total), style: theme.textTheme.titleLarge),
+                if (submissionId case final id?) _UploadStatus(id),
               ],
             ),
           ),
@@ -61,6 +80,58 @@ class SummaryScreen extends StatelessWidget {
     if (score >= 70) return 'Great moves!';
     if (score >= 50) return 'Getting there';
     return 'Keep practicing';
+  }
+}
+
+/// One line under the score; never blocks the summary.
+class _UploadStatus extends ConsumerWidget {
+  const _UploadStatus(this.id);
+  final String id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(submissionStatusProvider.select((m) => m[id]));
+    if (state == null) return const SizedBox.shrink();
+    final (icon, text, color) = switch (state.status) {
+      SubmissionStatus.pending => (
+        Icons.cloud_upload_outlined,
+        SummaryScreen.savingText,
+        null,
+      ),
+      SubmissionStatus.saved => (
+        Icons.cloud_done_outlined,
+        SummaryScreen.savedText,
+        Colors.green,
+      ),
+      SubmissionStatus.queued => (
+        Icons.cloud_off_outlined,
+        SummaryScreen.queuedText,
+        null,
+      ),
+      SubmissionStatus.rejected => (
+        Icons.error_outline,
+        state.message ?? SubmitRejected.invalid,
+        Theme.of(context).colorScheme.error,
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

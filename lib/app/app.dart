@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import '../features/profile/profile_store.dart';
 import '../shared/backend/auth_providers.dart';
 import '../shared/backend/content_models.dart';
 import '../shared/backend/profile.dart';
+import '../shared/backend/sessions_providers.dart';
 import 'theme.dart';
 
 import '../features/home/home_screen.dart';
@@ -18,7 +21,6 @@ import '../features/trainers/content_gate.dart';
 import '../features/trainers/trainer_screen.dart';
 import '../features/trainers/trainers_provider.dart';
 import '../features/workout/workout_screen.dart';
-import '../features/workout/workout_session.dart';
 
 class _NotFound extends StatelessWidget {
   const _NotFound();
@@ -90,9 +92,12 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
     GoRoute(
       path: '/summary',
       builder: (context, state) {
-        final summary = state.extra;
-        return summary is SessionSummary
-            ? SummaryScreen(summary: summary)
+        final args = state.extra;
+        return args is SummaryArgs
+            ? SummaryScreen(
+                summary: args.summary,
+                submissionId: args.submissionId,
+              )
             : const _NotFound();
       },
     ),
@@ -110,12 +115,31 @@ class WiggleMoveApp extends ConsumerStatefulWidget {
   ConsumerState<WiggleMoveApp> createState() => _WiggleMoveAppState();
 }
 
-class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp> {
+class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp>
+    with WidgetsBindingObserver {
   final _refresh = ValueNotifier(0);
   late final GoRouter _router = _buildRouter(ref, _refresh);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // App start: upload plays queued while offline (if signed in).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _flushPending());
+  }
+
+  void _flushPending() {
+    if (mounted) unawaited(ref.read(sessionSyncProvider).flush());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _flushPending();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _router.dispose();
     _refresh.dispose();
     super.dispose();
@@ -124,7 +148,11 @@ class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp> {
   @override
   Widget build(BuildContext context) {
     // Re-run route redirects when sign-in or onboarding state changes.
-    ref.listen(authUserProvider, (_, _) => _refresh.value++);
+    ref.listen(authUserProvider, (prev, next) {
+      _refresh.value++;
+      // Sign-in (or account switch): upload that user's queued plays.
+      if (next != null && next.id != prev?.id) _flushPending();
+    });
     ref.listen(profileProvider, (_, _) => _refresh.value++);
     return MaterialApp.router(
       title: 'Wiggle Move',

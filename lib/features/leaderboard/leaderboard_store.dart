@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/backend/offline_sessions_repository.dart';
+import '../../shared/backend/sessions_providers.dart';
 import '../../shared/prefs.dart';
 
 class LeaderboardEntry {
@@ -45,14 +47,14 @@ class LeaderboardEntry {
   }
 }
 
-const _entriesKey = 'leaderboard_entries';
-
-/// Stores played sessions on this device. Swap for Supabase to share a
-/// leaderboard between users (see docs/PROJECT.md).
+/// Plays stored on this device. Written by `OfflineSessionsRepository`
+/// (WM_OFFLINE) through the sessions repository; reloaded whenever a play's
+/// upload status changes. Server-backed leaderboard: WM-24.
 class LeaderboardNotifier extends Notifier<List<LeaderboardEntry>> {
   @override
   List<LeaderboardEntry> build() {
-    final raw = ref.read(sharedPrefsProvider).getString(_entriesKey);
+    ref.watch(submissionStatusProvider);
+    final raw = ref.read(sharedPrefsProvider).getString(localLeaderboardKey);
     if (raw == null) return const [];
     try {
       final list = jsonDecode(raw);
@@ -64,16 +66,6 @@ class LeaderboardNotifier extends Notifier<List<LeaderboardEntry>> {
     } on FormatException {
       return const [];
     }
-  }
-
-  Future<void> add(LeaderboardEntry entry) async {
-    state = [...state, entry];
-    await ref
-        .read(sharedPrefsProvider)
-        .setString(
-          _entriesKey,
-          jsonEncode(state.map((e) => e.toJson()).toList()),
-        );
   }
 }
 

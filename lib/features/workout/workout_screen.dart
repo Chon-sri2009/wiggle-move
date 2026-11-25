@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../shared/backend/auth_providers.dart';
+import '../../shared/backend/sessions_providers.dart';
+import '../../shared/uuid.dart';
 import '../../shared/widgets/async_states.dart';
-import '../leaderboard/leaderboard_store.dart';
 import '../../shared/backend/content_models.dart';
+import '../summary/summary_screen.dart';
 import 'pose_service.dart';
 import 'workout_session.dart';
 
@@ -115,25 +117,35 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     }
   }
 
-  Future<void> _finish() async {
+  void _finish() {
     if (_finished) return;
     _finished = true;
     _timer?.cancel();
+    _stopwatch.stop();
     final summary = _session.summary();
-    final name = ref.read(authUserProvider)?.displayName;
-    if (name != null) {
-      await ref
-          .read(leaderboardProvider.notifier)
-          .add(
-            LeaderboardEntry(
-              playerName: name,
-              routineId: widget.routine.id,
-              score: summary.totalScore,
-              playedAt: DateTime.now(),
-            ),
-          );
+    final userId = ref.read(authUserProvider)?.id;
+    String? nonce;
+    if (userId != null) {
+      // One nonce per play: the queue resends this same submission, so the
+      // server stores it at most once. duration_ms is the measured play time
+      // (the timeline ends at the routine length, so it is ~1.0x of it; the
+      // server accepts 0.8x..3x).
+      nonce = uuidV4();
+      final submission = summary.toSubmission(
+        userId: userId,
+        clientNonce: nonce,
+        durationMs: _stopwatch.elapsedMilliseconds,
+        playedAt: DateTime.now(),
+      );
+      // Not awaited: the summary shows the upload status as it changes.
+      unawaited(ref.read(sessionSyncProvider).submit(submission));
     }
-    if (mounted) context.pushReplacement('/summary', extra: summary);
+    if (mounted) {
+      context.pushReplacement(
+        '/summary',
+        extra: SummaryArgs(summary, submissionId: nonce),
+      );
+    }
   }
 
   @override

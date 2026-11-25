@@ -1,6 +1,7 @@
 import '../scoring/move_scorer.dart';
 import '../../shared/pose/pose_math.dart';
 import '../../shared/backend/content_models.dart';
+import '../../shared/backend/sessions_repository.dart';
 
 class MoveOutcome {
   const MoveOutcome(this.move, this.result);
@@ -18,6 +19,33 @@ class SessionSummary {
       : (outcomes.map((o) => o.result.score).reduce((a, b) => a + b) /
                 outcomes.length)
             .round();
+
+  /// The `submit_session` payload for this play. [score] is [totalScore]
+  /// (the server checks it against round(mean of move scores) ±1); move
+  /// indexes are positions in the routine. [clientNonce] must be generated
+  /// once per play so retries stay idempotent.
+  SessionSubmission toSubmission({
+    required String userId,
+    required String clientNonce,
+    required int durationMs,
+    required DateTime playedAt,
+  }) => SessionSubmission(
+    routineId: routine.id,
+    clientNonce: clientNonce,
+    durationMs: durationMs,
+    score: totalScore,
+    playedAt: playedAt,
+    userId: userId,
+    results: [
+      for (var i = 0; i < outcomes.length; i++)
+        MoveSubmission(
+          moveIdx: i,
+          score: outcomes[i].result.score,
+          worstJoint: outcomes[i].result.worstJoint?.name,
+          deviation: outcomes[i].result.worstSignedDeviation,
+        ),
+    ],
+  );
 }
 
 /// Tracks which move is active for a routine and scores frames against it.
