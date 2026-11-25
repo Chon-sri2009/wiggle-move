@@ -28,3 +28,12 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      # submit_session validation is pure TypeScript; Node 24 runs .ts
+      # directly (type stripping needs Node >= 22.18 / 23.6).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Edge Function tests
+        run: node --test "supabase/functions/submit_session/*.test.ts"

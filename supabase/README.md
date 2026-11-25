@@ -9,13 +9,17 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 | `migrations/20260101000100_rls.sql` | WM-08 grants + RLS policies. |
 | `migrations/20260101000200_leaderboard.sql` | WM-09 `public.leaderboard(...)` security-definer function; `sessions.client_nonce` made `not null`. |
 | `migrations/20260101000300_storage.sql` | WM-11 `routine-videos` Storage bucket (public read, service-role-only writes). |
+| `migrations/20260101000400_submit_session.sql` | WM-10 `public.submit_session_tx(...)`: atomic, idempotent session + move_results insert (service_role only). |
+| `functions/submit_session/` | WM-10 Edge Function: `index.ts` (Deno handler), `validate.ts` (pure validation), `validate.test.ts` (node tests). |
 | `seed.sql` | WM-11 content seed: trainers, routines, moves mirroring `lib/features/trainers/trainer_data.dart`. |
 | `tests/rls_test.sql` | WM-08 pgTAP tests (cross-user reads/writes, anon access, content writes). |
 | `tests/leaderboard_test.sql` | WM-09 pgTAP tests (ranking, ties, weekly filter, caller row, privileges). |
+| `tests/submit_session_test.sql` | WM-10 pgTAP tests (atomic insert, idempotent retry, rollback on bad data, privileges). |
 
 > **Not executed yet.** These files were written without Postgres, Docker or
 > the Supabase CLI available, so neither the migrations nor the tests have
-> been run. The first person with the CLI should run the commands below and
+> been run, nor has the Deno handler `functions/submit_session/index.ts`
+> (only its pure validation is tested, with Node). The first person with the CLI should run the commands below and
 > fix anything that fails before anything is pushed.
 
 ## Local workflow
@@ -33,6 +37,17 @@ supabase test db     # run supabase/tests/*.sql with pgTAP
 supabase link --project-ref <ref>
 supabase db push     # applies new migrations to the linked project
 ```
+
+Edge Function:
+
+```powershell
+supabase functions deploy submit_session
+```
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
+injected into Edge Functions by Supabase; never set or commit them. JWT
+verification stays on (the default), and the function also checks the user
+itself.
 
 A human reviews every migration before `db push` — especially anything
 touching RLS, grants or `security definer` functions. Never edit an applied
@@ -68,6 +83,56 @@ migration; add a new one.
     (`is_me = true`) if it is outside the top.
   - Client call: `supabase.rpc('leaderboard', params: {'p_routine_id': id,
     'p_period': 'week'})`.
+
+## submit_session (WM-10)
+
+The only way to store a play. `POST /functions/v1/submit_session` with
+`Authorization: Bearer <user access token>` (the Flutter client does this via
+`supabase.functions.invoke('submit_session', body: ...)`, WM-23).
+
+Request body (JSON, max 32 KB, exactly these keys, no others):
+
+```json
+{
+  "routine_id": "mia-pop-starter",
+  "client_nonce": "3f2b8c1e-9a4d-4c7b-8e2f-1a2b3c4d5e6f",
+  "duration_ms": 10000,
+  "score": 70,
+  "results": [
+    {"move_idx": 0, "score": 60, "worst_joint": "leftElbow", "deviation": -12.5},
+    {"move_idx": 1, "score": 80, "worst_joint": null, "deviation": null}
+  ]
+}
+```
+
+Rules (`functions/submit_session/validate.ts`):
+- `routine_id`: existing routine (else 404), string up to 64 chars.
+- `client_nonce`: UUID, generated once per play and reused on retries.
+- `duration_ms`: integer within 0.8x..3x the routine's `duration_ms`.
+- `results`: exactly one entry per move, `move_idx` 0..n-1 each once (any
+  order); `score` integer 0..100; `worst_joint` null or a Dart `Joint.name`;
+  `deviation` null or a finite signed number (degrees, measured - target)
+  with |deviation| <= 360.
+- `score`: integer 0..100 equal to round(mean of move scores) +-1
+  (`SessionSummary.totalScore`).
+- Rate limit: 30 sessions per user per rolling hour (then 429).
+
+Responses: `200 {"session_id": "...", "score": 70, "duplicate": false}`;
+a retry with the same nonce returns the stored session with
+`"duplicate": true`. Errors are `{"error": "<code>"}`: 400 (validation code
+from `ERR` in `validate.ts`, e.g. `score_mismatch`, or
+`rejected_by_database`), 401 `unauthorized`, 404 `routine_not_found`,
+405, 413 `payload_too_large`, 429 `rate_limited`, 500 `internal_error`.
+
+Storage goes through `public.submit_session_tx(...)` (security definer,
+`search_path = ''`, EXECUTE for `service_role` only): one call inserts the
+session and its move_results atomically; `(user_id, client_nonce)` makes it
+idempotent, including concurrent retries.
+
+Tests: `node --test "supabase/functions/submit_session/*.test.ts"` (Node >=
+22.18; also in CI) for validation. The Deno handler `index.ts` has no
+automated test: run it with `supabase functions serve submit_session` and
+call it with a signed-in user's token.
 
 ## Seed data
 
