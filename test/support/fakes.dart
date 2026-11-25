@@ -5,6 +5,7 @@ import 'package:wiggle_move/shared/backend/content_models.dart';
 import 'package:wiggle_move/shared/backend/content_repository.dart';
 import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
+import 'package:wiggle_move/shared/backend/sessions_repository.dart';
 import 'package:wiggle_move/shared/backend/trainer_data.dart';
 
 /// In-memory [AuthRepository] for tests. Set [failWith] to make the next
@@ -104,6 +105,26 @@ class FakeProfileRepository implements ProfileRepository {
     final f = failSave;
     if (f != null) throw f;
     profiles[_uid] = profile;
+  }
+}
+
+/// Scripted [SessionsRepository]: each submit takes the next outcome from
+/// [script] (saved when empty). Set [gate] to hold submits until completed;
+/// set [throwWith] to make submits throw. Submissions are recorded.
+class FakeSessionsRepository implements SessionsRepository {
+  final script = <SubmitOutcome>[];
+  final submitted = <SessionSubmission>[];
+  Completer<void>? gate;
+  Object? throwWith;
+
+  @override
+  Future<SubmitOutcome> submit(SessionSubmission submission) async {
+    submitted.add(submission);
+    final g = gate;
+    if (g != null) await g.future;
+    final t = throwWith;
+    if (t != null) throw t;
+    return script.isEmpty ? const SubmitSaved() : script.removeAt(0);
   }
 }
 
