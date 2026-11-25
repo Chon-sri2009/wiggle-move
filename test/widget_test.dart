@@ -6,6 +6,8 @@ import 'package:wiggle_move/app/app.dart';
 import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
+import 'package:wiggle_move/shared/backend/content_providers.dart';
+import 'package:wiggle_move/shared/backend/offline_content_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_profile_repository.dart';
 import 'package:wiggle_move/shared/backend/profile_providers.dart';
@@ -20,6 +22,9 @@ Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
       authRepositoryProvider.overrideWithValue(OfflineAuthRepository(instance)),
       profileRepositoryProvider.overrideWithValue(
         OfflineProfileRepository(instance),
+      ),
+      contentRepositoryProvider.overrideWithValue(
+        const OfflineContentRepository(),
       ),
     ],
     child: const WiggleMoveApp(),

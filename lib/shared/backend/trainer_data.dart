@@ -131,10 +131,3 @@ final builtInTrainers = <Trainer>[
     ],
   ),
 ];
-Trainer? trainerById(String id) =>
-    builtInTrainers.where((t) => t.id == id).firstOrNull;
-
-Routine? routineById(String id) => builtInTrainers
-    .expand((t) => t.routines)
-    .where((r) => r.id == id)
-    .firstOrNull;

@@ -8,6 +8,7 @@ import 'package:wiggle_move/app/app.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
+import 'package:wiggle_move/shared/backend/content_providers.dart';
 import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_providers.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
@@ -31,6 +32,7 @@ Future<Widget> _app(
       sharedPrefsProvider.overrideWithValue(prefs),
       authRepositoryProvider.overrideWithValue(auth),
       profileRepositoryProvider.overrideWithValue(repo),
+      contentRepositoryProvider.overrideWithValue(FakeContentRepository()),
     ],
     child: const WiggleMoveApp(),
   );

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/widgets/async_states.dart';
-import '../../shared/backend/trainer_data.dart';
+import '../trainers/trainers_provider.dart';
 import 'leaderboard_store.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
@@ -21,7 +21,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final entries = ref.watch(leaderboardProvider);
     final me = ref.watch(authUserProvider)?.displayName;
     final ranked = rankEntries(entries, routineId: _routineId);
-    final routines = builtInTrainers.expand((t) => t.routines).toList();
+    // Content may still be loading: filter chips appear once it is there.
+    final routines = [
+      for (final t in ref.watch(trainersProvider).value?.trainers ?? const [])
+        ...t.routines,
+    ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Leaderboard')),
@@ -62,7 +66,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                         leading: CircleAvatar(child: Text('${i + 1}')),
                         title: Text(e.playerName),
                         subtitle: Text(
-                          routineById(e.routineId)?.name ?? e.routineId,
+                          routines
+                                  .where((r) => r.id == e.routineId)
+                                  .firstOrNull
+                                  ?.name ??
+                              e.routineId,
                         ),
                         trailing: Text(
                           '${e.score}',

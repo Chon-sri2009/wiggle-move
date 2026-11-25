@@ -4,7 +4,7 @@ import 'package:wiggle_move/shared/backend/trainer_data.dart';
 import 'package:wiggle_move/features/workout/workout_session.dart';
 
 void main() {
-  final routine = routineById('pop-starter')!;
+  final routine = builtInTrainers.first.routines.first;
 
   test('advances through moves by elapsed time and finishes', () {
     final s = WorkoutSession(routine);
