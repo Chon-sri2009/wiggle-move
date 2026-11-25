@@ -7,7 +7,9 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 |---|---|
 | `migrations/20260101000000_schema.sql` | WM-07 tables: `profiles`, `trainers`, `routines`, `moves`, `sessions`, `move_results`; trigger creating a profile per auth user. RLS is enabled on every table here. |
 | `migrations/20260101000100_rls.sql` | WM-08 grants + RLS policies. |
+| `migrations/20260101000200_leaderboard.sql` | WM-09 `public.leaderboard(...)` security-definer function; `sessions.client_nonce` made `not null`. |
 | `tests/rls_test.sql` | WM-08 pgTAP tests (cross-user reads/writes, anon access, content writes). |
+| `tests/leaderboard_test.sql` | WM-09 pgTAP tests (ranking, ties, weekly filter, caller row, privileges). |
 
 > **Not executed yet.** These files were written without Postgres, Docker or
 > the Supabase CLI available, so neither the migrations nor the tests have
@@ -45,10 +47,25 @@ migration; add a new one.
   by service role (admin, seed).
 - **sessions / move_results** — signed-in user selects only their own rows. No
   client writes at all; the `submit_session` Edge Function (WM-10) writes with
-  the service role. `sessions.client_nonce` + `unique (user_id, client_nonce)`
-  makes retried submits idempotent.
-- The leaderboard (WM-09) must expose ranked data via a `security definer`
-  function/view, not by loosening these policies.
+  the service role. `sessions.client_nonce` (required since WM-09) +
+  `unique (user_id, client_nonce)` makes retried submits idempotent.
+- **leaderboard** — `public.leaderboard(p_routine_id text default null,
+  p_period text default 'all', p_limit int default 50)`, callable by
+  `authenticated` only (EXECUTE revoked from `public`/`anon`). It is
+  `security definer` with `search_path = ''`, so it can rank everyone without
+  loosening the policies above, and returns only
+  `rank, display_name, avatar, score, is_me` (no user ids or emails).
+  - `p_routine_id` set: each user's best session score on that routine.
+    `null` (global): sum over routines of each user's best score per routine.
+  - `p_period`: `'all'` or `'week'` (`played_at >= date_trunc('week', now())`,
+    Monday 00:00 in the DB time zone, UTC on Supabase); anything else raises
+    SQLSTATE `22023`.
+  - Ranked with `rank()` (ties share a rank). Tied rows are ordered by who
+    reached the score first, then display name. Empty names show as `Player`.
+  - Top `p_limit` rows (clamped to 1..100), plus the caller's own row
+    (`is_me = true`) if it is outside the top.
+  - Client call: `supabase.rpc('leaderboard', params: {'p_routine_id': id,
+    'p_period': 'week'})`.
 
 ## Notes
 

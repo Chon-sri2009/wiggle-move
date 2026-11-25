@@ -27,7 +27,7 @@ Reference choreography (per routine) ──────────►├─► 
 - **Client:** Flutter, feature-first (`lib/features/*`), Riverpod state, go_router.
 - **Pose detection:** `google_mlkit_pose_detection`, on-device. Privacy: video never leaves the phone.
 - **Scoring (proposed):** compute joint angles (elbows, shoulders, hips, knees) from landmarks; compare to the reference angles at the matching timestamp; tolerance band → score 0–100 per move; flag the joints whose angle deviation is largest (this drives the "what went wrong" summary). Reference poses are produced offline by running the trainer video through the same detector and stored with the routine.
-- **Backend:** Supabase — Postgres + Auth + Row Level Security. Tables (`supabase/migrations`): `profiles`, `trainers`, `routines`, `moves`, `sessions`, `move_results`; a `leaderboard` view comes in WM-09.
+- **Backend:** Supabase — Postgres + Auth + Row Level Security. Tables (`supabase/migrations`): `profiles`, `trainers`, `routines`, `moves`, `sessions`, `move_results`; ranked scores come from the security-definer RPC `public.leaderboard(p_routine_id, p_period, p_limit)` (WM-09).
 - **Anti-cheat (later):** sanity-check submitted scores server-side (bounds, rate) — the client is not trusted.
 
 ## 4. Decisions
