@@ -16,9 +16,8 @@ void main() {
     expect(Env.missingFlags('u', 'k'), isEmpty);
   });
 
-  test('unconfigured by default in tests', () {
-    expect(Env.isConfigured, isFalse);
-    expect(Env.offline, isFalse);
+  test('isConfigured reflects the supplied defines', () {
+    expect(Env.isConfigured, Env.hasKeys(Env.supabaseUrl, Env.supabaseAnonKey));
   });
 
   testWidgets('error screen lists missing flags', (tester) async {

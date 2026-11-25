@@ -15,7 +15,7 @@ dart format lib test
 flutter analyze
 flutter test
 ```
-All three must be clean. Add/adjust tests for logic changes (scoring especially).
+All three must be clean. Add/adjust tests for logic changes (scoring especially). CI (`.github/workflows/ci.yml`) runs the same checks on every PR and push to `main`.
 
 ## PR description
 What changed, why, how you tested (device model if camera/pose related), screenshots for UI.
