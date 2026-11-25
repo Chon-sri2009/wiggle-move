@@ -20,6 +20,25 @@ void main() {
     expect(Env.isConfigured, Env.hasKeys(Env.supabaseUrl, Env.supabaseAnonKey));
   });
 
+  test('offline mode is forbidden only in release builds', () {
+    expect(Env.offlineForbidden(offline: true, release: true), isTrue);
+    expect(Env.offlineForbidden(offline: true, release: false), isFalse);
+    expect(Env.offlineForbidden(offline: false, release: true), isFalse);
+    expect(Env.offlineForbidden(offline: false, release: false), isFalse);
+  });
+
+  testWidgets('error screen can show a custom message', (tester) async {
+    await tester.pumpWidget(
+      const EnvErrorScreen(
+        title: 'Offline mode not allowed',
+        message: 'WM_OFFLINE cannot be used in a release build.',
+      ),
+    );
+    expect(find.text('Offline mode not allowed'), findsOneWidget);
+    expect(find.textContaining('release build'), findsOneWidget);
+    expect(find.textContaining('--dart-define=SUPABASE_URL'), findsNothing);
+  });
+
   testWidgets('error screen lists missing flags', (tester) async {
     await tester.pumpWidget(
       const EnvErrorScreen(missing: ['SUPABASE_URL', 'SUPABASE_ANON_KEY']),

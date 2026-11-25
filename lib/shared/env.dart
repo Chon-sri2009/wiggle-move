@@ -14,6 +14,12 @@ class Env {
   static bool hasKeys(String url, String anonKey) =>
       url.isNotEmpty && anonKey.isNotEmpty;
 
+  /// Offline mode skips real auth, so a release build must refuse it.
+  static bool offlineForbidden({
+    required bool offline,
+    required bool release,
+  }) => offline && release;
+
   /// The dart-define flag names that are missing for the given values.
   static List<String> missingFlags(String url, String anonKey) => [
     if (url.isEmpty) 'SUPABASE_URL',

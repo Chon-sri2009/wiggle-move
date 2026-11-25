@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../leaderboard/leaderboard_store.dart';
+import '../../shared/prefs.dart';
 
 const _onboardedKey = 'onboarded';
 const _goalsKey = 'profile_goals';

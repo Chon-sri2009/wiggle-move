@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,12 +6,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
-import 'features/leaderboard/leaderboard_store.dart';
 import 'shared/env.dart';
 import 'shared/env_error_screen.dart';
+import 'shared/prefs.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Offline mode has no real auth: never allow it in a shipped build.
+  if (Env.offlineForbidden(offline: Env.offline, release: kReleaseMode)) {
+    runApp(
+      const EnvErrorScreen(
+        title: 'Offline mode not allowed',
+        message:
+            'WM_OFFLINE=true is for development only and cannot be used in '
+            'a release build. Build with SUPABASE_URL and SUPABASE_ANON_KEY.',
+      ),
+    );
+    return;
+  }
   if (!Env.offline && !Env.isConfigured) {
     runApp(
       EnvErrorScreen(

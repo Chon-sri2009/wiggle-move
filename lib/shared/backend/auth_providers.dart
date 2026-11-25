@@ -1,9 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../features/leaderboard/leaderboard_store.dart'
-    show sharedPrefsProvider;
 import '../env.dart';
+import '../prefs.dart';
 import 'auth_repository.dart';
 import 'offline_auth_repository.dart';
 import 'supabase_auth_repository.dart';

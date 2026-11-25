@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiggle_move/app/app.dart';
-import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
+import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
 
