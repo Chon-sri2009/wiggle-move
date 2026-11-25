@@ -114,6 +114,13 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// Avatar letter: first character of the last word of [name], or '?'.
+String trainerInitial(String name) {
+  final words = name.trim().split(RegExp(r'\s+'));
+  final last = words.last;
+  return last.isEmpty ? '?' : last.characters.first;
+}
+
 class _StaleNote extends StatelessWidget {
   const _StaleNote();
 
@@ -126,7 +133,7 @@ class _StaleNote extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            "You're offline — showing saved content. Pull down to refresh.",
+            "Couldn't update — showing saved content. Pull down to retry.",
             style: TextStyle(color: Theme.of(context).hintColor),
           ),
         ),
@@ -150,7 +157,7 @@ class _TrainerCard extends StatelessWidget {
           radius: 28,
           backgroundColor: trainer.color,
           child: Text(
-            trainer.name.split(' ').last[0],
+            trainerInitial(trainer.name),
             style: const TextStyle(
               color: AppColors.primary,
               fontSize: 24,

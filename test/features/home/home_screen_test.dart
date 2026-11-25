@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiggle_move/app/app.dart';
+import 'package:wiggle_move/features/home/home_screen.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/content_cache.dart';
 import 'package:wiggle_move/shared/backend/content_providers.dart';
@@ -45,7 +46,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Coach Jay'), findsOneWidget);
     expect(find.text('Coach Mia'), findsNothing);
-    expect(find.textContaining('offline'), findsNothing);
+    expect(find.textContaining('saved content'), findsNothing);
   });
 
   testWidgets('no cache + failure shows an error; Retry loads content', (
@@ -74,14 +75,14 @@ void main() {
     await tester.pumpWidget(await _app(repo, cached: true));
     await tester.pumpAndSettle();
     expect(find.text('Coach Mia'), findsOneWidget);
-    expect(find.textContaining('offline'), findsOneWidget);
+    expect(find.textContaining('saved content'), findsOneWidget);
 
     // Pull to refresh once the connection is back.
     repo.failWith = null;
     await tester.fling(find.text('Coach Mia'), const Offset(0, 400), 1000);
     await tester.pumpAndSettle();
     expect(find.text('Coach Jay'), findsOneWidget);
-    expect(find.textContaining('offline'), findsNothing);
+    expect(find.textContaining('saved content'), findsNothing);
   });
 
   testWidgets('trainer route opens content from the provider', (tester) async {
@@ -90,5 +91,13 @@ void main() {
     await tester.tap(find.text('Coach Jay'));
     await tester.pumpAndSettle();
     expect(find.text('Cardio Burn'), findsOneWidget);
+  });
+
+  test('trainerInitial never throws on odd names', () {
+    expect(trainerInitial('Coach Mia'), 'M');
+    expect(trainerInitial('Coach Mia '), 'M');
+    expect(trainerInitial('Jay'), 'J');
+    expect(trainerInitial(''), '?');
+    expect(trainerInitial('   '), '?');
   });
 }

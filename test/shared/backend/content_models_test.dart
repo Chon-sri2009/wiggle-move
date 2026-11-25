@@ -47,6 +47,26 @@ void main() {
       expect(targetToJson(t), {'leftKnee': 125.0, 'rightKnee': 124.5});
     });
 
+    test('equal sort_order falls back to id order', () {
+      final rows = seedRows();
+      for (final t in rows) {
+        t['sort_order'] = 0;
+      }
+      final mia = rows[1]['routines']! as List;
+      for (final r in mia) {
+        (r as Map)['sort_order'] = 0;
+      }
+      final trainers = trainersFromRows(rows);
+      expect(trainers.map((t) => t.id), ['jay', 'mia']);
+      expect(trainers.last.routines.map((r) => r.id), [
+        'disco-fever',
+        'pop-starter',
+      ]);
+      // Same result whatever the response order.
+      final reversed = trainersFromRows(rows.reversed.toList());
+      expect(_enc(reversed), _enc(trainers));
+    });
+
     test('a non-list response is malformed', () {
       expect(() => trainersFromRows({'x': 1}), throwsFormatException);
       expect(() => trainersFromRows(null), throwsFormatException);
@@ -54,6 +74,10 @@ void main() {
 
     final malformed = <String, void Function(List<Map<String, Object?>>)>{
       'missing trainer name': (r) => r[0].remove('name'),
+      'empty trainer name': (r) => r[0]['name'] = '',
+      'blank trainer name': (r) => r[0]['name'] = '  ',
+      'routine with no moves': (r) =>
+          ((r[0]['routines']! as List)[0] as Map)['moves'] = <Object?>[],
       'color out of range': (r) => r[0]['color'] = 0x100000000,
       'negative color': (r) => r[0]['color'] = -1,
       'routines not a list': (r) => r[0]['routines'] = null,

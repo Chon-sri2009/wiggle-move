@@ -1,7 +1,7 @@
 -- WM-07: Wiggle Move schema.
 --
--- Mirrors the app models in lib/features/trainers/trainer.dart,
--- lib/features/profile/profile_store.dart and lib/features/scoring/*.
+-- Mirrors the app models in lib/shared/backend/content_models.dart,
+-- lib/features/profile/profile_store.dart and lib/shared/pose/pose_math.dart.
 -- Every table has row level security enabled here, so no table is ever
 -- exposed without RLS. Policies and grants live in the next migration
 -- (20260101000100_rls.sql, WM-08); until then RLS denies all client access.

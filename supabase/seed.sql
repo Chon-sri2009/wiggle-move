@@ -1,6 +1,6 @@
 -- WM-11: Content seed (trainers -> routines -> moves).
 --
--- Mirrors lib/features/trainers/trainer_data.dart exactly: same ids, names,
+-- Mirrors lib/shared/backend/trainer_data.dart exactly: same ids, names,
 -- styles, levels, move order, instructions, durations and target angles.
 -- Keep the two in sync when either changes.
 --

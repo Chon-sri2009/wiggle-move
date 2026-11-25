@@ -166,5 +166,68 @@ void main() {
       expect(c.read(routineProvider('cardio-burn'))!.name, 'Cardio Burn');
       expect(c.read(routineProvider('nope')), isNull);
     });
+
+    group('overlapping refreshes: the newest fetch wins', () {
+      // Fetch 1 = initial background revalidation, fetch 2 = pull-to-refresh.
+      Future<
+        (ProviderContainer, SharedPreferences, List<Completer<List<Trainer>>>)
+      >
+      setUp() async {
+        final calls = <Completer<List<Trainer>>>[];
+        final repo = FakeContentRepository()
+          ..onFetch = () {
+            final c = Completer<List<Trainer>>();
+            calls.add(c);
+            return c.future;
+          };
+        final (c, prefs) = await _container(
+          repo,
+          prefs: await _cachePrefs(_cachedOnly),
+        );
+        c.listen(trainersProvider, (_, _) {});
+        await pumpEventQueue();
+        final refresh = c.read(trainersProvider.notifier).refresh();
+        unawaited(refresh);
+        await pumpEventQueue();
+        expect(calls, hasLength(2));
+        return (c, prefs, calls);
+      }
+
+      final newer = builtInTrainers; // ['mia', 'jay']
+      final older = [builtInTrainers.last]; // ['jay']
+
+      test('older success arriving last is ignored', () async {
+        final (c, prefs, calls) = await setUp();
+        calls[1].complete(newer);
+        await pumpEventQueue();
+        calls[0].complete(older);
+        await pumpEventQueue();
+        final s = c.read(trainersProvider).value!;
+        expect(_ids(s), ['mia', 'jay']);
+        expect(s.isStale, isFalse);
+        expect(ContentCache(prefs).read()!.trainers, hasLength(2));
+      });
+
+      test('older failure arriving last is ignored', () async {
+        final (c, prefs, calls) = await setUp();
+        calls[1].complete(newer);
+        await pumpEventQueue();
+        calls[0].completeError(_network);
+        await pumpEventQueue();
+        final s = c.read(trainersProvider).value!;
+        expect(_ids(s), ['mia', 'jay']);
+        expect(s.isStale, isFalse);
+        expect(ContentCache(prefs).read()!.trainers, hasLength(2));
+      });
+
+      test('newer failure keeps what is shown, not the start list', () async {
+        final (c, _, calls) = await setUp();
+        calls[1].completeError(_network);
+        await pumpEventQueue();
+        final s = c.read(trainersProvider).value!;
+        expect(_ids(s), ['mia']);
+        expect(s.isStale, isTrue);
+      });
+    });
   });
 }

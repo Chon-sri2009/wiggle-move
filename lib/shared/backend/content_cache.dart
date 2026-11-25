@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +26,7 @@ class ContentCache {
         savedAt: DateTime.parse(json['saved_at'] as String),
       );
     } catch (_) {
-      _prefs.remove(key);
+      unawaited(_prefs.remove(key));
       return null;
     }
   }

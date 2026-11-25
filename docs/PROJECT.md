@@ -50,7 +50,7 @@ These are defaults picked at project start; change them via PR that updates this
 8. **Polish:** onboarding, permission states, skeleton overlay, sound/haptics, store release.
 
 ### Calibration
-Target angles in `lib/features/trainers/trainer_data.dart` are estimates for a user standing front-on, whole body in frame, ~2 m from the camera. Angles are measured in the 2D image plane, so moves toward/away from the camera (squats, forward lunges) are under-measured; prefer front-plane moves or add the ML Kit z-coordinate later. To calibrate: do each pose, log the measured angles, and update the targets.
+Target angles in `lib/shared/backend/trainer_data.dart` (built-in/offline content) and `supabase/seed.sql` are estimates for a user standing front-on, whole body in frame, ~2 m from the camera. Angles are measured in the 2D image plane, so moves toward/away from the camera (squats, forward lunges) are under-measured; prefer front-plane moves or add the ML Kit z-coordinate later. To calibrate: do each pose, log the measured angles, and update the targets.
 
 ## 6. Setup for new teammates
 1. Install Flutter 3.47+ and Android Studio (Android SDK) and/or Xcode (macOS, iOS).

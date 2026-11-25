@@ -108,7 +108,7 @@ class FakeProfileRepository implements ProfileRepository {
 }
 
 /// In-memory [ContentRepository]. Set [gate] to hold fetches until completed;
-/// set [failWith] to make fetches throw.
+/// set [failWith] to make fetches throw; set [onFetch] to script each call.
 class FakeContentRepository implements ContentRepository {
   FakeContentRepository([List<Trainer>? trainers])
     : trainers = trainers ?? builtInTrainers;
@@ -118,9 +118,14 @@ class FakeContentRepository implements ContentRepository {
   Object? failWith;
   int fetches = 0;
 
+  /// When set, answers each fetch instead of [trainers]/[gate]/[failWith].
+  Future<List<Trainer>> Function()? onFetch;
+
   @override
   Future<List<Trainer>> fetchTrainers() async {
     fetches++;
+    final handler = onFetch;
+    if (handler != null) return handler();
     final g = gate;
     if (g != null) await g.future;
     final f = failWith;

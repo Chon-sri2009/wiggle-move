@@ -21,18 +21,20 @@ class TrainersState {
 /// fetches; success replaces and re-caches it, failure keeps the cached copy
 /// and marks it stale. With no cache a failure is an [AsyncError] (Retry).
 class TrainersNotifier extends AsyncNotifier<TrainersState> {
+  /// Bumped by every fetch; only the latest fetch may write state or cache.
+  int _generation = 0;
+
   @override
   FutureOr<TrainersState> build() {
     final cached = ref.watch(contentCacheProvider).read();
-    if (cached == null) return _fetch();
-    unawaited(_revalidate(cached.trainers));
+    if (cached == null) return _initialFetch();
+    unawaited(_revalidate());
     return TrainersState(cached.trainers);
   }
 
   /// Pull-to-refresh / Retry. Never throws; the outcome is in [state].
   Future<void> refresh() async {
-    final current = state.value;
-    if (current != null) return _revalidate(current.trainers);
+    if (state.hasValue) return _revalidate();
     ref.invalidateSelf();
     try {
       await future;
@@ -41,30 +43,48 @@ class TrainersNotifier extends AsyncNotifier<TrainersState> {
     }
   }
 
-  Future<TrainersState> _fetch() async {
+  Future<TrainersState> _initialFetch() async {
+    final trainers = await _fetchLatest();
+    // Superseded only by a rebuild, which discards this result anyway.
+    if (trainers == null) {
+      throw const RepositoryFailure(RepositoryFailure.generic);
+    }
+    return TrainersState(trainers);
+  }
+
+  /// Fetches and caches the content. Returns null (and leaves state and
+  /// cache alone) when a newer fetch started meanwhile or the provider was
+  /// rebuilt; otherwise throws [RepositoryFailure] on error.
+  Future<List<Trainer>?> _fetchLatest() async {
+    final generation = ++_generation;
+    bool isLatest() => ref.mounted && generation == _generation;
     final ContentRepository repo = ref.read(contentRepositoryProvider);
     final cache = ref.read(contentCacheProvider);
     final List<Trainer> trainers;
     try {
       trainers = await repo.fetchTrainers();
     } catch (e) {
+      if (!isLatest()) return null;
       throw mapRepositoryException(e);
     }
+    if (!isLatest()) return null;
     try {
       await cache.save(trainers);
     } catch (_) {
       // A failed cache write must not hide fresh content.
     }
-    return TrainersState(trainers);
+    return trainers;
   }
 
-  Future<void> _revalidate(List<Trainer> current) async {
+  Future<void> _revalidate() async {
     try {
-      final fresh = await _fetch();
-      if (ref.mounted) state = AsyncData(fresh);
+      final fresh = await _fetchLatest();
+      if (fresh != null && ref.mounted) state = AsyncData(TrainersState(fresh));
     } on RepositoryFailure catch (e) {
-      if (ref.mounted) {
-        state = AsyncData(TrainersState(current, refreshError: e));
+      // Keep whatever is shown now (it may be newer than when we started).
+      final shown = ref.mounted ? state.value?.trainers : null;
+      if (shown != null) {
+        state = AsyncData(TrainersState(shown, refreshError: e));
       }
     }
   }

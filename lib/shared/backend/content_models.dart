@@ -128,10 +128,13 @@ Trainer _trainer(Object? json, {required bool sorted}) => _parse('trainer', () {
   if (color < 0 || color > 0xFFFFFFFF) {
     throw const FormatException('color out of range');
   }
+  final name = m['name'] as String;
+  // The UI derives the avatar initial from the name.
+  if (name.trim().isEmpty) throw const FormatException('blank trainer name');
   final routines = _list(m['routines']);
   return Trainer(
     id: m['id'] as String,
-    name: m['name'] as String,
+    name: name,
     style: m['style'] as String,
     color: Color(color),
     routines: [
@@ -144,6 +147,8 @@ Trainer _trainer(Object? json, {required bool sorted}) => _parse('trainer', () {
 Routine _routine(Object? json, {required bool sorted}) => _parse('routine', () {
   final m = _map(json);
   final moves = _list(m['moves']);
+  // The DB does not require move rows; a workout needs at least one.
+  if (moves.isEmpty) throw const FormatException('routine has no moves');
   return Routine(
     id: m['id'] as String,
     name: m['name'] as String,
@@ -177,6 +182,11 @@ int _positiveInt(Object? value) {
   return v;
 }
 
-List<Object?> _sortedBy(List<Object?> rows, String key) =>
-    [...rows]
-      ..sort((a, b) => (_map(a)[key] as int).compareTo(_map(b)[key] as int));
+/// Sorted by [key], then by `id` (when present) so ties are deterministic.
+List<Object?> _sortedBy(List<Object?> rows, String key) => [...rows]
+  ..sort((a, b) {
+    final ma = _map(a), mb = _map(b);
+    final byKey = (ma[key] as int).compareTo(mb[key] as int);
+    if (byKey != 0) return byKey;
+    return ((ma['id'] as String?) ?? '').compareTo((mb['id'] as String?) ?? '');
+  });
