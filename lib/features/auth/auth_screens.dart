@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../app/wiggle_logo.dart';
+import '../../shared/widgets/app_snackbar.dart';
+import '../../shared/widgets/app_text_field.dart';
+import '../../shared/widgets/primary_button.dart';
 import '../leaderboard/leaderboard_store.dart';
 
 /// Login / sign-up UI from the Figma. Accounts are not connected yet
@@ -60,29 +63,29 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     const Center(child: WiggleLogo(size: 32)),
                     const SizedBox(height: 40),
                     if (signUp) ...[
-                      TextFormField(
+                      AppTextField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(hintText: 'Name'),
+                        hint: 'Name',
                         validator: (v) => (v == null || v.trim().isEmpty)
                             ? 'Enter your name'
                             : null,
                       ),
                       const SizedBox(height: 12),
                     ],
-                    TextFormField(
+                    AppTextField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(hintText: 'Email'),
+                      hint: 'Email',
                       validator: (v) => (v == null || !v.contains('@'))
                           ? 'Enter a valid email'
                           : null,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
+                    AppTextField(
                       controller: _password,
                       obscureText: true,
-                      decoration: const InputDecoration(hintText: 'Password'),
+                      hint: 'Password',
                       validator: (v) => (v == null || v.length < 6)
                           ? 'At least 6 characters'
                           : null,
@@ -100,9 +103,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ),
                     const SizedBox(height: 16),
                     Center(
-                      child: FilledButton(
+                      child: PrimaryButton(
                         onPressed: _submit,
-                        child: Text(signUp ? 'Sign up' : 'Login'),
+                        label: signUp ? 'Sign up' : 'Login',
                       ),
                     ),
                     if (!signUp) ...[
@@ -181,8 +184,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   static void _soon(BuildContext context, String what) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$what is coming soon.')));
+    showAppSnackBar(context, '$what is coming soon.');
   }
 }
 

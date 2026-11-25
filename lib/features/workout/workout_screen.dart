@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/widgets/async_states.dart';
 import '../leaderboard/leaderboard_store.dart';
 import '../trainers/trainer.dart';
 import 'pose_service.dart';
@@ -157,7 +158,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
       body: _error != null
           ? _Message(_error!)
           : camera == null || !camera.value.isInitialized
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : Stack(
               fit: StackFit.expand,
               children: [

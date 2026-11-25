@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/widgets/async_states.dart';
 import '../trainers/trainer_data.dart';
 import 'leaderboard_store.dart';
 
@@ -47,10 +48,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           ),
           Expanded(
             child: ranked.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No scores yet. Finish a routine to get on the board!',
-                    ),
+                ? const EmptyView(
+                    message:
+                        'No scores yet. Finish a routine to get on the board!',
                   )
                 : ListView.builder(
                     itemCount: ranked.length,

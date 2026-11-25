@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/widgets/app_card.dart';
+import '../../shared/widgets/primary_button.dart';
 import '../scoring/move_scorer.dart';
 import '../workout/workout_session.dart';
 
@@ -41,9 +43,9 @@ class SummaryScreen extends StatelessWidget {
           const SizedBox(height: 8),
           for (final outcome in summary.outcomes) _MoveCard(outcome),
           const SizedBox(height: 16),
-          FilledButton(
+          PrimaryButton(
             onPressed: () => context.go('/leaderboard'),
-            child: const Text('See leaderboard'),
+            label: 'See leaderboard',
           ),
           TextButton(
             onPressed: () => context.go('/'),
@@ -73,37 +75,35 @@ class _MoveCard extends StatelessWidget {
     final color = result.score >= 80
         ? Colors.green
         : (result.score >= 50 ? Colors.orange : Colors.red);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    outcome.move.name,
-                    style: theme.textTheme.titleMedium,
-                  ),
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  outcome.move.name,
+                  style: theme.textTheme.titleMedium,
                 ),
-                Text(
-                  '${result.score}',
-                  style: theme.textTheme.titleLarge?.copyWith(color: color),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            LinearProgressIndicator(
-              value: result.score / 100,
-              color: color,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            const SizedBox(height: 8),
-            Text(_feedback(result), style: theme.textTheme.bodyMedium),
-          ],
-        ),
+              ),
+              Text(
+                '${result.score}',
+                style: theme.textTheme.titleLarge?.copyWith(color: color),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: result.score / 100,
+            color: color,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          const SizedBox(height: 8),
+          Text(_feedback(result), style: theme.textTheme.bodyMedium),
+        ],
       ),
     );
   }

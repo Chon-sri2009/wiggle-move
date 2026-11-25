@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/widgets/app_card.dart';
 import 'trainer.dart';
 
 class TrainerScreen extends StatelessWidget {
@@ -25,7 +26,7 @@ class TrainerScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           for (final routine in trainer.routines)
-            Card(
+            AppCard(
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
                 title: Text(

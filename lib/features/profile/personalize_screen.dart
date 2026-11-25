@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/widgets/primary_button.dart';
 import 'profile_store.dart';
 
 class _Option {
@@ -146,13 +147,13 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
                   Expanded(child: SingleChildScrollView(child: _stepBody())),
                 ],
                 Center(
-                  child: FilledButton(
+                  child: PrimaryButton(
                     onPressed: _canContinue ? _next : null,
-                    child: Text(switch (_step) {
+                    label: switch (_step) {
                       0 => 'Start',
                       3 => 'Create My Workout Plan',
                       _ => 'Next',
-                    }),
+                    },
                   ),
                 ),
               ],

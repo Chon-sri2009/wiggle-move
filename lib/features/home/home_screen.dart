@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/widgets/app_card.dart';
 import '../leaderboard/leaderboard_store.dart';
 import '../trainers/trainer_data.dart';
 
@@ -50,7 +51,7 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           for (final trainer in trainers)
-            Card(
+            AppCard(
               clipBehavior: Clip.antiAlias,
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
