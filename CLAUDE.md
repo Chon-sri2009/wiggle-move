@@ -25,16 +25,17 @@ Feature-first under `lib/`:
 - `lib/main.dart` — entry, wraps app in `ProviderScope`
 - `lib/app/` — `MaterialApp.router`, theme, routes
 - `lib/features/<feature>/` — one folder per feature: `home`, `trainers` (models + seed data), `scoring` (pure angle math + scorer), `workout` (session, ML Kit service, camera screen), `summary`, `leaderboard` (local store). Keep UI, providers and data code for a feature together.
-- Code shared by 2+ features goes in `lib/shared/` (create when first needed).
+- Code shared by 2+ features goes in `lib/shared/` (`env.dart` holds dart-define config; `env_error_screen.dart` is the startup error).
 - Tests mirror `lib/` under `test/`.
 
 ## Conventions
 - Pose scoring logic is **pure Dart** (landmarks in → scores out) with no Flutter/camera imports, so it is unit-testable without a device. Test it.
 - No secrets in git. Supabase URL/anon key come via `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`.
+- Without those flags the app shows a startup error; pass `--dart-define=WM_OFFLINE=true` to run the local-only app (dev/test).
 - Never upload camera frames. Only scores and per-move results are stored.
 - Don't add a dependency without saying why in the PR.
 - Follow `analysis_options.yaml` (flutter_lints). Prefer `const` widgets.
-- The package is still named `wiggle_move_app1` (from `flutter create`); imports use `package:wiggle_move_app1/...`.
+- The package is named `wiggle_move` (the folder is still `wiggle_move_app1`); imports use `package:wiggle_move/...`.
 
 ## Git
 Branch from `main` → `feature/<short-name>` / `fix/<short-name>`; PR into `main`; one logical change per commit, imperative subject. Details in CONTRIBUTING.

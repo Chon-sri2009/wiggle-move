@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wiggle_move_app1/app/app.dart';
-import 'package:wiggle_move_app1/features/leaderboard/leaderboard_store.dart';
+import 'package:wiggle_move/app/app.dart';
+import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
 
 Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
   SharedPreferences.setMockInitialValues(prefs);

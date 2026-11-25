@@ -1,4 +1,4 @@
-package com.example.wiggle_move_app1
+package com.example.wiggle_move
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "wiggle_move_app1" "\0"
+            VALUE "FileDescription", "wiggle_move" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "wiggle_move_app1" "\0"
+            VALUE "InternalName", "wiggle_move" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "wiggle_move_app1.exe" "\0"
-            VALUE "ProductName", "wiggle_move_app1" "\0"
+            VALUE "OriginalFilename", "wiggle_move.exe" "\0"
+            VALUE "ProductName", "wiggle_move" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

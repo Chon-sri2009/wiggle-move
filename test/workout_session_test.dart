@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wiggle_move_app1/features/scoring/pose_math.dart';
-import 'package:wiggle_move_app1/features/trainers/trainer_data.dart';
-import 'package:wiggle_move_app1/features/workout/workout_session.dart';
+import 'package:wiggle_move/features/scoring/pose_math.dart';
+import 'package:wiggle_move/features/trainers/trainer_data.dart';
+import 'package:wiggle_move/features/workout/workout_session.dart';
 
 void main() {
   final routine = routineById('pop-starter')!;
