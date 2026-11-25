@@ -8,6 +8,8 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 | `migrations/20260101000000_schema.sql` | WM-07 tables: `profiles`, `trainers`, `routines`, `moves`, `sessions`, `move_results`; trigger creating a profile per auth user. RLS is enabled on every table here. |
 | `migrations/20260101000100_rls.sql` | WM-08 grants + RLS policies. |
 | `migrations/20260101000200_leaderboard.sql` | WM-09 `public.leaderboard(...)` security-definer function; `sessions.client_nonce` made `not null`. |
+| `migrations/20260101000300_storage.sql` | WM-11 `routine-videos` Storage bucket (public read, service-role-only writes). |
+| `seed.sql` | WM-11 content seed: trainers, routines, moves mirroring `lib/features/trainers/trainer_data.dart`. |
 | `tests/rls_test.sql` | WM-08 pgTAP tests (cross-user reads/writes, anon access, content writes). |
 | `tests/leaderboard_test.sql` | WM-09 pgTAP tests (ranking, ties, weekly filter, caller row, privileges). |
 
@@ -21,7 +23,7 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 ```powershell
 supabase init        # once, only if supabase/config.toml does not exist yet
 supabase start       # local stack in Docker
-supabase db reset    # recreate local DB: apply all migrations (+ seed.sql once WM-11 adds it)
+supabase db reset    # recreate local DB: apply all migrations, then seed.sql
 supabase test db     # run supabase/tests/*.sql with pgTAP
 ```
 
@@ -66,6 +68,29 @@ migration; add a new one.
     (`is_me = true`) if it is outside the top.
   - Client call: `supabase.rpc('leaderboard', params: {'p_routine_id': id,
     'p_period': 'week'})`.
+
+## Seed data
+
+`seed.sql` holds the same trainers / routines / moves as
+`lib/features/trainers/trainer_data.dart` (ids, names, styles, ARGB colors,
+levels, move order, instructions, durations, target angles). **Change both
+together.** Every insert is `on conflict ... do update`, so the seed can be
+re-run; `routines.video_path` is left untouched on re-seed, and moves beyond a
+routine's current length are deleted. A `do` block at the end fails the seed
+if the move count or any `routines.duration_ms` (sum of its moves) is off.
+`supabase db reset` runs it locally; for a hosted project run it once as an
+admin (SQL editor or `psql`), never from the app.
+
+There is no automated Dart-vs-SQL parity test yet (comparing the two would
+need SQL parsing in a Dart test, which would be brittle); review both files
+side by side when editing.
+
+## Storage
+
+Bucket `routine-videos` (public). Anyone can read/stream objects; only the
+service role uploads/replaces/deletes (no write policies exist on
+`storage.objects` for this bucket). Store the object path in
+`routines.video_path`, e.g. `mia/pop-starter.mp4`.
 
 ## Notes
 
