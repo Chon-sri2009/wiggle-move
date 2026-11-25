@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {
   DEVIATION_MAX_ABS,
   ERR,
+  isValidNonce,
   JOINT_NAMES,
   MAX_RESULTS,
   MAX_ROUTINE_ID_LENGTH,
@@ -100,6 +101,15 @@ test('client_nonce must be a UUID string', () => {
     expectError(payload({ client_nonce: n }), ERR.invalidNonce);
   }
   expectOk(payload({ client_nonce: '3F2B8C1E-9A4D-4C7B-8E2F-1A2B3C4D5E6F' }));
+});
+
+test('isValidNonce (used for the pre-validation idempotency lookup) accepts only UUID strings', () => {
+  assert.equal(isValidNonce('3f2b8c1e-9a4d-4c7b-8e2f-1a2b3c4d5e6f'), true);
+  assert.equal(isValidNonce('3F2B8C1E-9A4D-4C7B-8E2F-1A2B3C4D5E6F'), true);
+  for (const n of [undefined, null, 1, {}, '', 'not-a-uuid', '3f2b8c1e9a4d4c7b8e2f1a2b3c4d5e6f',
+    ' 3f2b8c1e-9a4d-4c7b-8e2f-1a2b3c4d5e6f']) {
+    assert.equal(isValidNonce(n), false, String(n));
+  }
 });
 
 test('duration_ms must be an integer', () => {

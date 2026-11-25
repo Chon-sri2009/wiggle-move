@@ -122,7 +122,15 @@ a retry with the same nonce returns the stored session with
 `"duplicate": true`. Errors are `{"error": "<code>"}`: 400 (validation code
 from `ERR` in `validate.ts`, e.g. `score_mismatch`, or
 `rejected_by_database`), 401 `unauthorized`, 404 `routine_not_found`,
-405, 413 `payload_too_large`, 429 `rate_limited`, 500 `internal_error`.
+405 `method_not_allowed`, 413 `payload_too_large`, 429 `rate_limited`,
+500 `internal_error` / `server_error` / `server_misconfigured`.
+
+Order: auth -> size cap + JSON parse -> `client_nonce` shape check ->
+idempotency lookup -> routine + validation -> rate limit -> insert. A retry
+of an already-stored play (same nonce) always returns `200` with
+`"duplicate": true` and the stored score, even after the rate limit is hit or
+the routine changed. The rate limit is best-effort (count, then insert; not
+atomic).
 
 Storage goes through `public.submit_session_tx(...)` (security definer,
 `search_path = ''`, EXECUTE for `service_role` only): one call inserts the

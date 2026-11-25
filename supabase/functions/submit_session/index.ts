@@ -5,6 +5,16 @@
 // and stores session + move_results atomically via public.submit_session_tx.
 // Clients never insert into sessions/move_results themselves (RLS, WM-08).
 //
+// Order: auth -> size cap + parse -> idempotency lookup -> load routine +
+// validate -> rate limit -> rpc. The idempotency lookup comes first so that
+// a retry of an already-stored play (same client_nonce) always gets the same
+// 200 duplicate answer, even if the user has since hit the rate limit or the
+// routine changed (WM-23's offline retry queue relies on this). Validation
+// comes before the rate-limit count so garbage payloads cost no count query.
+// The rate limit is best-effort: count-then-insert is not atomic, so
+// concurrent requests can slightly exceed it. submit_session_tx itself is
+// still idempotent if two first submits with one nonce race.
+//
 // Env (injected by Supabase, never hardcoded): SUPABASE_URL,
 // SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 // Never log request bodies, headers or tokens.
@@ -12,6 +22,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import {
   ERR,
+  isValidNonce,
   isValidRoutineId,
   MAX_BODY_BYTES,
   RATE_LIMIT_PER_HOUR,
@@ -78,12 +89,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
     return error(400, ERR.invalidPayload);
   }
-  const routineId = (payload as Record<string, unknown>).routine_id;
-  if (!isValidRoutineId(routineId)) return error(400, ERR.invalidRoutineId);
+  const nonce = (payload as Record<string, unknown>).client_nonce;
+  if (!isValidNonce(nonce)) return error(400, ERR.invalidNonce);
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // --- Idempotency: already stored? (unique index on user_id, client_nonce)
+  const { data: existing, error: existingError } = await admin
+    .from('sessions')
+    .select('id, score')
+    .eq('user_id', userId)
+    .eq('client_nonce', nonce)
+    .maybeSingle();
+  if (existingError) {
+    console.error('submit_session: idempotency lookup failed', existingError.code);
+    return error(500, 'server_error');
+  }
+  if (existing) {
+    return json(200, { session_id: existing.id, score: existing.score, duplicate: true });
+  }
+
+  const routineId = (payload as Record<string, unknown>).routine_id;
+  if (!isValidRoutineId(routineId)) return error(400, ERR.invalidRoutineId);
 
   // --- Routine + move count -----------------------------------------------
   const { data: routine, error: routineError } = await admin
@@ -106,21 +135,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return error(500, 'internal_error');
   }
 
-  // --- Rate limit (sessions in the last hour) -----------------------------
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count: recent, error: rateError } = await admin
-    .from('sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('played_at', since);
-  if (rateError || recent === null) {
-    console.error('submit_session: rate count failed', rateError?.code);
-    return error(500, 'internal_error');
-  }
-  if (!rateLimitDecision(recent, RATE_LIMIT_PER_HOUR).allowed) {
-    return error(429, 'rate_limited');
-  }
-
   // --- Validate -----------------------------------------------------------
   const result = validateSubmission(payload, {
     id: routine.id,
@@ -134,6 +148,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       : error(400, result.error);
   }
   const v = result.value;
+
+  // --- Rate limit (sessions in the last hour; best-effort, not atomic) ----
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count: recent, error: rateError } = await admin
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('played_at', since);
+  if (rateError || recent === null) {
+    console.error('submit_session: rate count failed', rateError?.code);
+    return error(500, 'internal_error');
+  }
+  if (!rateLimitDecision(recent, RATE_LIMIT_PER_HOUR).allowed) {
+    return error(429, 'rate_limited');
+  }
 
   // --- Store atomically ---------------------------------------------------
   const { data: rows, error: rpcError } = await admin.rpc('submit_session_tx', {
@@ -161,13 +190,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const duplicate = row.duplicate === true;
   let score = v.score;
   if (duplicate) {
-    // A retry returns what was stored the first time, not the new payload.
-    const { data: stored } = await admin
+    // Only reached when a concurrent request with the same nonce committed
+    // between the idempotency lookup and the rpc. Return what was stored
+    // first, not this payload's score.
+    const { data: stored, error: storedError } = await admin
       .from('sessions')
       .select('score')
       .eq('id', row.session_id)
       .maybeSingle();
-    if (stored) score = stored.score;
+    if (storedError || !stored) {
+      console.error('submit_session: stored score lookup failed', storedError?.code);
+      return error(500, 'server_error');
+    }
+    score = stored.score;
   }
 
   return json(200, { session_id: row.session_id, score, duplicate });

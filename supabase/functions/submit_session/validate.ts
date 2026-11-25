@@ -111,6 +111,11 @@ export function isValidRoutineId(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= MAX_ROUTINE_ID_LENGTH;
 }
 
+/** UUID shape check; index.ts uses it before the idempotency lookup. */
+export function isValidNonce(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v);
+}
+
 export function validateSubmission(payload: unknown, routine: RoutineInfo): ValidationResult {
   if (
     !Number.isInteger(routine.moveCount) || routine.moveCount < 1 ||
@@ -127,9 +132,7 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
   if (!isValidRoutineId(routine_id)) return fail(ERR.invalidRoutineId);
   if (routine_id !== routine.id) return fail(ERR.routineMismatch);
 
-  if (typeof client_nonce !== 'string' || !UUID_RE.test(client_nonce)) {
-    return fail(ERR.invalidNonce);
-  }
+  if (!isValidNonce(client_nonce)) return fail(ERR.invalidNonce);
 
   if (!Number.isInteger(duration_ms)) return fail(ERR.invalidDuration);
   const d = duration_ms as number;
