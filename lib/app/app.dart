@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_screens.dart';
-import '../features/leaderboard/leaderboard_store.dart';
 import '../features/profile/personalize_screen.dart';
 import '../features/profile/profile_store.dart';
+import '../shared/backend/auth_providers.dart';
 import 'theme.dart';
 
 import '../features/home/home_screen.dart';
@@ -31,7 +31,7 @@ const _authPaths = {'/login', '/signup'};
 GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
   refreshListenable: refresh,
   redirect: (context, state) {
-    final signedIn = ref.read(playerNameProvider) != null;
+    final signedIn = ref.read(authUserProvider) != null;
     final onboarded = ref.read(profileProvider).onboarded;
     final loc = state.matchedLocation;
     if (!signedIn) return _authPaths.contains(loc) ? null : '/login';
@@ -99,7 +99,7 @@ class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp> {
   @override
   Widget build(BuildContext context) {
     // Re-run route redirects when sign-in or onboarding state changes.
-    ref.listen(playerNameProvider, (_, _) => _refresh.value++);
+    ref.listen(authUserProvider, (_, _) => _refresh.value++);
     ref.listen(profileProvider, (_, _) => _refresh.value++);
     return MaterialApp.router(
       title: 'Wiggle Move',

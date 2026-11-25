@@ -35,6 +35,7 @@ Reference choreography (per routine) ──────────►├─► 
 - **On-device ML Kit** over server inference — low latency, no video upload, no GPU cost. Trade-off: mobile only, and ML Kit accuracy is limited for fast or occluded movement.
 - **Supabase** over custom backend — auth, DB and RLS out of the box for a small team. Revisit if scoring must move server-side.
 - Riverpod + go_router — standard, testable, minimal boilerplate.
+- **Repository pattern for backend access** (WM-20) — each backend area is an abstract class in `lib/shared/backend/` with a Supabase implementation and an in-memory/offline one; a Riverpod provider picks by `Env` (`WM_OFFLINE` → offline), and tests override the provider with a fake.
 
 These are defaults picked at project start; change them via PR that updates this section.
 

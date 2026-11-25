@@ -1,18 +1,39 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../app/wiggle_logo.dart';
+import '../../shared/backend/auth_providers.dart';
+import '../../shared/backend/auth_repository.dart';
+import '../../shared/env.dart';
 import '../../shared/widgets/app_snackbar.dart';
 import '../../shared/widgets/app_text_field.dart';
 import '../../shared/widgets/primary_button.dart';
-import '../leaderboard/leaderboard_store.dart';
 
-/// Login / sign-up UI from the Figma. Accounts are not connected yet
-/// (Supabase is on the roadmap): submitting only stores a display name on
-/// the device. Nothing is sent anywhere and the password is discarded.
+const minPasswordLength = 8;
+const maxNameLength = 40; // profiles.display_name check constraint
+final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+String? validateEmail(String? v) =>
+    (v == null || !_emailPattern.hasMatch(v.trim()))
+    ? 'Enter a valid email'
+    : null;
+
+String? validatePassword(String? v) =>
+    (v == null || v.length < minPasswordLength)
+    ? 'At least $minPasswordLength characters'
+    : null;
+
+String? validateName(String? v) {
+  final name = v?.trim() ?? '';
+  if (name.isEmpty) return 'Enter your name';
+  if (name.length > maxNameLength) return 'At most $maxNameLength characters';
+  return null;
+}
+
+/// Login / sign-up from the Figma, backed by [authRepositoryProvider].
+/// The router redirect moves on once the auth state changes.
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key, required this.signUp});
   final bool signUp;
@@ -26,6 +47,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -36,12 +58,38 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
+    if (_busy || !_form.currentState!.validate()) return;
+    final repo = ref.read(authRepositoryProvider);
     final email = _email.text.trim();
-    final name = widget.signUp ? _name.text.trim() : email.split('@').first;
-    // Router redirect moves on to personalization / home once a name is set.
-    await ref.read(playerNameProvider.notifier).set(name);
+    setState(() => _busy = true);
+    try {
+      if (widget.signUp) {
+        await repo.signUp(
+          email: email,
+          password: _password.text,
+          displayName: _name.text.trim(),
+        );
+        // With email confirmation on, Supabase creates no session yet.
+        if (repo.currentUser == null && mounted) {
+          showAppSnackBar(
+            context,
+            'Check your email to confirm your account, then log in.',
+          );
+        }
+      } else {
+        await repo.signIn(email: email, password: _password.text);
+      }
+    } on AuthFailure catch (e) {
+      if (mounted) showAppSnackBar(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
+
+  Future<void> _forgotPassword() => showDialog<void>(
+    context: context,
+    builder: (_) => _ResetPasswordDialog(initialEmail: _email.text.trim()),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +115,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
                         hint: 'Name',
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Enter your name'
-                            : null,
+                        validator: validateName,
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -77,24 +123,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
                       hint: 'Email',
-                      validator: (v) => (v == null || !v.contains('@'))
-                          ? 'Enter a valid email'
-                          : null,
+                      validator: validateEmail,
                     ),
                     const SizedBox(height: 12),
                     AppTextField(
                       controller: _password,
                       obscureText: true,
                       hint: 'Password',
-                      validator: (v) => (v == null || v.length < 6)
-                          ? 'At least 6 characters'
-                          : null,
+                      validator: validatePassword,
                     ),
                     if (!signUp)
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () => _soon(context, 'Password reset'),
+                          onPressed: _busy ? null : _forgotPassword,
                           child: const Text(
                             'Forgot your password?',
                             style: TextStyle(fontSize: 12),
@@ -105,6 +147,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     Center(
                       child: PrimaryButton(
                         onPressed: _submit,
+                        loading: _busy,
                         label: signUp ? 'Sign up' : 'Login',
                       ),
                     ),
@@ -164,11 +207,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                       ),
                     ),
-                    if (kDebugMode)
+                    if (Env.offline)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'Dev build: accounts are not connected yet.',
+                          'Offline mode: accounts stay on this device.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelSmall,
                         ),
@@ -185,6 +228,77 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   static void _soon(BuildContext context, String what) {
     showAppSnackBar(context, '$what is coming soon.');
+  }
+}
+
+/// Asks for an email and sends a reset link. The confirmation is the same
+/// whether or not an account exists for that email.
+class _ResetPasswordDialog extends ConsumerStatefulWidget {
+  const _ResetPasswordDialog({required this.initialEmail});
+  final String initialEmail;
+
+  @override
+  ConsumerState<_ResetPasswordDialog> createState() =>
+      _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
+  final _form = GlobalKey<FormState>();
+  late final _email = TextEditingController(text: widget.initialEmail);
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_busy || !_form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(authRepositoryProvider)
+          .sendPasswordReset(_email.text.trim());
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'If an account exists for that email, a reset link is on its way.',
+          ),
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        showAppSnackBar(context, e.message, isError: true);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset password'),
+      content: Form(
+        key: _form,
+        child: AppTextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          hint: 'Email',
+          validator: validateEmail,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        PrimaryButton(onPressed: _send, loading: _busy, label: 'Send link'),
+      ],
+    );
   }
 }
 

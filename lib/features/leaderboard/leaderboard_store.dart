@@ -50,7 +50,6 @@ class LeaderboardEntry {
 }
 
 const _entriesKey = 'leaderboard_entries';
-const _nameKey = 'player_name';
 
 /// Stores played sessions on this device. Swap for Supabase to share a
 /// leaderboard between users (see docs/PROJECT.md).
@@ -86,25 +85,6 @@ final leaderboardProvider =
     NotifierProvider<LeaderboardNotifier, List<LeaderboardEntry>>(
       LeaderboardNotifier.new,
     );
-
-class PlayerNameNotifier extends Notifier<String?> {
-  @override
-  String? build() => ref.read(sharedPrefsProvider).getString(_nameKey);
-
-  Future<void> set(String name) async {
-    state = name;
-    await ref.read(sharedPrefsProvider).setString(_nameKey, name);
-  }
-
-  Future<void> clear() async {
-    state = null;
-    await ref.read(sharedPrefsProvider).remove(_nameKey);
-  }
-}
-
-final playerNameProvider = NotifierProvider<PlayerNameNotifier, String?>(
-  PlayerNameNotifier.new,
-);
 
 /// Best score per player for [routineId] (all routines if null), highest first.
 List<LeaderboardEntry> rankEntries(

@@ -4,12 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiggle_move/app/app.dart';
 import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
+import 'package:wiggle_move/shared/backend/auth_providers.dart';
+import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
 
 Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
   SharedPreferences.setMockInitialValues(prefs);
   final instance = await SharedPreferences.getInstance();
   return ProviderScope(
-    overrides: [sharedPrefsProvider.overrideWithValue(instance)],
+    overrides: [
+      sharedPrefsProvider.overrideWithValue(instance),
+      // The WM_OFFLINE implementation: exercises the local end-to-end path.
+      authRepositoryProvider.overrideWithValue(OfflineAuthRepository(instance)),
+    ],
     child: const WiggleMoveApp(),
   );
 }
@@ -46,11 +52,46 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Password'),
-      'secret1',
+      'secret12',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Login'));
     await tester.pumpAndSettle();
     expect(find.text('Personalization'), findsOneWidget);
+  });
+
+  testWidgets('offline sign up -> personalize -> home', (tester) async {
+    await tester.pumpWidget(await _app());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign up'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Name'), 'Cy');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'cy@x.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'secret12',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign up'));
+    await tester.pumpAndSettle();
+    expect(find.text('Personalization'), findsOneWidget);
+
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Burn Calories'));
+    await tester.pump();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cardio'));
+    await tester.pump();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Beginner'));
+    await tester.pump();
+    await tester.tap(find.text('Create My Workout Plan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hi, Cy'), findsOneWidget);
   });
 
   testWidgets('personalization flow ends on home', (tester) async {

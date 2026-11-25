@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'features/leaderboard/leaderboard_store.dart';
@@ -17,6 +18,13 @@ Future<void> main() async {
       ),
     );
     return;
+  }
+  if (!Env.offline) {
+    // Restores a saved session from device storage before the first frame.
+    await Supabase.initialize(
+      url: Env.supabaseUrl,
+      publishableKey: Env.supabaseAnonKey,
+    );
   }
   // Pose scoring assumes a portrait camera image.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

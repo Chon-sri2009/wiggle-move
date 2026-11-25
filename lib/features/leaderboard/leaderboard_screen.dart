@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/backend/auth_providers.dart';
 import '../../shared/widgets/async_states.dart';
 import '../trainers/trainer_data.dart';
 import 'leaderboard_store.dart';
@@ -18,7 +19,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = ref.watch(leaderboardProvider);
-    final me = ref.watch(playerNameProvider);
+    final me = ref.watch(authUserProvider)?.displayName;
     final ranked = rankEntries(entries, routineId: _routineId);
     final routines = trainers.expand((t) => t.routines).toList();
 

@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../shared/widgets/app_card.dart';
-import '../leaderboard/leaderboard_store.dart';
+import '../../shared/backend/auth_providers.dart';
+import '../../shared/backend/auth_repository.dart';
+import '../../shared/widgets/app_snackbar.dart';
 import '../trainers/trainer_data.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -13,7 +15,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final name = ref.watch(playerNameProvider) ?? '';
+    final name = ref.watch(authUserProvider)?.displayName ?? '';
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -101,9 +103,15 @@ class HomeScreen extends ConsumerWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
-              ref.read(playerNameProvider.notifier).clear();
+              try {
+                await ref.read(authRepositoryProvider).signOut();
+              } on AuthFailure catch (e) {
+                if (context.mounted) {
+                  showAppSnackBar(context, e.message, isError: true);
+                }
+              }
             },
             child: const Text('Sign out'),
           ),

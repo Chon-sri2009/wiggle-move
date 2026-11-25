@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/backend/auth_providers.dart';
 import '../../shared/widgets/async_states.dart';
 import '../leaderboard/leaderboard_store.dart';
 import '../trainers/trainer.dart';
@@ -119,7 +120,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     _finished = true;
     _timer?.cancel();
     final summary = _session.summary();
-    final name = ref.read(playerNameProvider);
+    final name = ref.read(authUserProvider)?.displayName;
     if (name != null) {
       await ref
           .read(leaderboardProvider.notifier)
