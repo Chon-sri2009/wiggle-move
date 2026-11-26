@@ -10,6 +10,7 @@ class HistoryEntry {
     required this.durationMs,
     required this.playedAt,
     required this.results,
+    this.sets = 1,
   });
 
   final String id;
@@ -17,6 +18,9 @@ class HistoryEntry {
   final int score;
   final int durationMs;
   final DateTime playedAt;
+
+  /// Sets played (1 for plays stored on this device).
+  final int sets;
 
   /// Per-move results by move index (empty when only the total was stored,
   /// as for plays kept on this device under WM_OFFLINE).
@@ -35,7 +39,10 @@ List<HistoryEntry> historyEntriesFromJson(Object? json) {
         final id = row['id'], routine = row['routine_id'];
         final score = row['score'], duration = row['duration_ms'];
         final at = row['played_at'], rawResults = row['move_results'];
-        if (id is! String ||
+        final sets = row['sets'];
+        if (sets is! int ||
+            sets < 1 ||
+            id is! String ||
             routine is! String ||
             score is! int ||
             duration is! int ||
@@ -55,6 +62,7 @@ List<HistoryEntry> historyEntriesFromJson(Object? json) {
           score: score,
           durationMs: duration,
           playedAt: playedAt,
+          sets: sets,
           results: results,
         );
       }(),

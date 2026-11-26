@@ -16,6 +16,7 @@ Map<String, Object?> _row({
   Object? score = 80,
   Object? duration = 24000,
   Object? at = '2026-11-25T12:00:00+00:00',
+  Object? sets = 1,
   Object? results,
 }) => {
   'id': id,
@@ -23,6 +24,7 @@ Map<String, Object?> _row({
   'score': score,
   'duration_ms': duration,
   'played_at': at,
+  'sets': sets,
   'move_results':
       results ??
       [
@@ -57,6 +59,8 @@ void main() {
       expect(e.results.map((r) => r.moveIdx), [0, 1]);
       expect(e.results[1].worstJoint, 'leftKnee');
       expect(e.results[1].deviation, 12.0); // int from the server -> double
+      expect(e.sets, 1);
+      expect(e.results.map((r) => r.reps), [0, 0]); // no reps key -> 0
     });
 
     test('an empty list is empty history', () {
@@ -70,6 +74,8 @@ void main() {
       'score as string': [_row(score: '8')],
       'duration null': [_row(duration: null)],
       'bad date': [_row(at: 'yesterday')],
+      'sets missing': [_row(sets: null)],
+      'sets zero': [_row(sets: 0)],
       'results missing': [
         {
           'id': 's',
@@ -77,6 +83,7 @@ void main() {
           'score': 1,
           'duration_ms': 1,
           'played_at': '2026-01-01T00:00:00Z',
+          'sets': 1,
         },
       ],
       'bad result row': [

@@ -30,7 +30,11 @@ final historyProvider = FutureProvider.autoDispose<List<HistoryEntry>>(
 /// changed since the play).
 SessionSummary? summaryFromHistory(HistoryEntry entry, Routine routine) {
   final results = entry.results;
-  if (results.isEmpty || results.length != routine.moves.length) return null;
+  if (results.isEmpty ||
+      results.length != routine.moves.length ||
+      entry.sets != routine.sets) {
+    return null;
+  }
   final joints = Joint.values.asNameMap();
   final outcomes = <MoveOutcome>[];
   for (final (i, r) in results.indexed) {
@@ -43,12 +47,17 @@ SessionSummary? summaryFromHistory(HistoryEntry entry, Routine routine) {
           score: r.score,
           // Frames are not stored: a move with no score and no worst joint
           // is the "never visible" case.
-          frames: r.score == 0 && joint == null ? 0 : 1,
+          frames: r.score == 0 && joint == null && r.reps == 0 ? 0 : 1,
+          reps: r.reps,
           worstJoint: joint,
           worstSignedDeviation: joint == null ? null : r.deviation,
         ),
       ),
     );
   }
-  return SessionSummary(routine: routine, outcomes: outcomes);
+  return SessionSummary(
+    routine: routine,
+    outcomes: outcomes,
+    durationMs: entry.durationMs,
+  );
 }

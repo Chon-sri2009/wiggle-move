@@ -14,8 +14,8 @@ class SupabaseHistoryRepository implements HistoryRepository {
         (limit) => client
             .from('sessions')
             .select(
-              'id, routine_id, score, duration_ms, played_at, '
-              'move_results(move_idx, score, worst_joint, deviation)',
+              'id, routine_id, score, duration_ms, played_at, sets, '
+              'move_results(move_idx, score, reps, worst_joint, deviation)',
             )
             .order('played_at', ascending: false)
             .limit(limit),

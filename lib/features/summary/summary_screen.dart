@@ -66,6 +66,7 @@ class SummaryScreen extends StatelessWidget {
                   ),
                 ),
                 Text(_grade(total), style: theme.textTheme.titleLarge),
+                _Stats(summary),
                 if (submissionId case final id?) _UploadStatus(id),
               ],
             ),
@@ -73,7 +74,8 @@ class SummaryScreen extends StatelessWidget {
           const SizedBox(height: 24),
           Text('Move by move', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          for (final outcome in summary.outcomes) _MoveCard(outcome),
+          for (final outcome in summary.outcomes)
+            _MoveCard(outcome, summary.routine.sets),
           const SizedBox(height: 16),
           PrimaryButton(
             onPressed: () => context.go('/leaderboard'),
@@ -93,6 +95,32 @@ class SummaryScreen extends StatelessWidget {
     if (score >= 70) return 'Great moves!';
     if (score >= 50) return 'Getting there';
     return 'Keep practicing';
+  }
+}
+
+/// Sets, reps and an energy estimate under the grade (only what applies).
+class _Stats extends StatelessWidget {
+  const _Stats(this.summary);
+  final SessionSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final kcal = summary.calories;
+    final parts = [
+      if (summary.routine.sets > 1) '${summary.routine.sets} sets',
+      if (summary.targetReps > 0)
+        '${summary.totalReps} / ${summary.targetReps} reps',
+      if (kcal != null && kcal > 0) '≈ $kcal kcal (estimate)',
+    ];
+    if (parts.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        parts.join(' · '),
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    );
   }
 }
 
@@ -149,8 +177,11 @@ class _UploadStatus extends ConsumerWidget {
 }
 
 class _MoveCard extends StatelessWidget {
-  const _MoveCard(this.outcome);
+  const _MoveCard(this.outcome, this.sets);
   final MoveOutcome outcome;
+
+  /// Sets played: the reps target of a move is per set.
+  final int sets;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +217,15 @@ class _MoveCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(3),
           ),
           const SizedBox(height: 8),
+          if (outcome.move.rep case final rep?) ...[
+            Text(
+              'Reps ${result.reps} / ${rep.target * sets}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
           Text(_feedback(result), style: theme.textTheme.bodyMedium),
         ],
       ),

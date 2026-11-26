@@ -37,7 +37,8 @@ class TrainerScreen extends StatelessWidget {
                 ),
                 subtitle: Text(
                   '${routine.level} · ${routine.moves.length} moves · '
-                  '${(routine.durationMs / 1000).round()}s',
+                  '${routine.sets > 1 ? '${routine.sets} sets · ' : ''}'
+                  '${(routine.totalDurationMs / 1000).round()}s',
                 ),
                 trailing: const Icon(
                   Icons.play_circle_fill,
