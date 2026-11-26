@@ -26,6 +26,11 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'History',
+            icon: const Icon(Icons.history),
+            onPressed: () => context.push('/history'),
+          ),
+          IconButton(
             tooltip: 'Leaderboard',
             icon: const Icon(Icons.emoji_events),
             onPressed: () => context.push('/leaderboard'),

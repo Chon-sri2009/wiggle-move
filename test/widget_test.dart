@@ -6,8 +6,10 @@ import 'package:wiggle_move/app/app.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/content_providers.dart';
+import 'package:wiggle_move/shared/backend/history_providers.dart';
 import 'package:wiggle_move/shared/backend/leaderboard_providers.dart';
 import 'package:wiggle_move/shared/backend/offline_content_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_history_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_leaderboard_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_profile_repository.dart';
@@ -26,6 +28,9 @@ Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
       ),
       contentRepositoryProvider.overrideWithValue(
         const OfflineContentRepository(),
+      ),
+      historyRepositoryProvider.overrideWithValue(
+        OfflineHistoryRepository(instance, playerName: () => 'Ann'),
       ),
       leaderboardRepositoryProvider.overrideWithValue(
         OfflineLeaderboardRepository(instance, playerName: () => 'Ann'),
@@ -163,6 +168,14 @@ void main() {
     await tester.tap(find.byTooltip('Leaderboard'));
     await tester.pumpAndSettle();
     expect(find.text('No scores yet — play a routine'), findsOneWidget);
+  });
+
+  testWidgets('history shows the empty state offline', (tester) async {
+    await tester.pumpWidget(await _app(_signedIn));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('History'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No plays yet'), findsOneWidget);
   });
 
   testWidgets('sign out returns to login', (tester) async {

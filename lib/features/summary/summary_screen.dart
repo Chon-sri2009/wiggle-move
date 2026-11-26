@@ -13,14 +13,27 @@ import '../workout/workout_session.dart';
 /// Route extra for `/summary`: the play and its upload id (client nonce),
 /// null when nothing was submitted (signed out).
 class SummaryArgs {
-  const SummaryArgs(this.summary, {this.submissionId});
+  const SummaryArgs(
+    this.summary, {
+    this.submissionId,
+    this.fromHistory = false,
+  });
   final SessionSummary summary;
   final String? submissionId;
+
+  /// Opened from the history list: shows a back arrow, not a fresh result.
+  final bool fromHistory;
 }
 
 class SummaryScreen extends StatelessWidget {
-  const SummaryScreen({super.key, required this.summary, this.submissionId});
+  const SummaryScreen({
+    super.key,
+    required this.summary,
+    this.submissionId,
+    this.fromHistory = false,
+  });
   final SessionSummary summary;
+  final bool fromHistory;
 
   /// Client nonce of the submitted play; its upload status is shown.
   final String? submissionId;
@@ -35,8 +48,8 @@ class SummaryScreen extends StatelessWidget {
     final total = summary.totalScore;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Session summary'),
-        automaticallyImplyLeading: false,
+        title: Text(fromHistory ? 'Past session' : 'Session summary'),
+        automaticallyImplyLeading: fromHistory,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

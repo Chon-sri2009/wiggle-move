@@ -15,6 +15,7 @@ import '../shared/backend/profile.dart';
 import '../shared/backend/sessions_providers.dart';
 import 'theme.dart';
 
+import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
 import '../features/summary/summary_screen.dart';
@@ -99,10 +100,12 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
             ? SummaryScreen(
                 summary: args.summary,
                 submissionId: args.submissionId,
+                fromHistory: args.fromHistory,
               )
             : const _NotFound();
       },
     ),
+    GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
     GoRoute(
       path: '/leaderboard',
       builder: (context, state) => const LeaderboardScreen(),

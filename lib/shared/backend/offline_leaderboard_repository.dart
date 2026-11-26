@@ -77,7 +77,10 @@ DateTime _weekStart(DateTime now) {
   return DateTime.utc(utc.year, utc.month, utc.day - (utc.weekday - 1));
 }
 
-String _name(String raw) {
+String _name(String raw) => localPlayerKey(raw);
+
+/// How a stored player name is told apart and shown: trimmed, blank = Player.
+String localPlayerKey(String raw) {
   final t = raw.trim();
   return t.isEmpty ? 'Player' : t;
 }

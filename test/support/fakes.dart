@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
 import 'package:wiggle_move/shared/backend/content_models.dart';
 import 'package:wiggle_move/shared/backend/content_repository.dart';
+import 'package:wiggle_move/shared/backend/history_repository.dart';
 import 'package:wiggle_move/shared/backend/leaderboard_repository.dart';
 import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
@@ -207,5 +208,23 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
     final f = failWith;
     if (f != null) throw f;
     return byQuery[q] ?? rows;
+  }
+}
+
+/// [HistoryRepository] returning [entries]; counts [fetches]. Set
+/// [failWith] to make fetches throw.
+class FakeHistoryRepository implements HistoryRepository {
+  FakeHistoryRepository([this.entries = const []]);
+
+  List<HistoryEntry> entries;
+  RepositoryFailure? failWith;
+  int fetches = 0;
+
+  @override
+  Future<List<HistoryEntry>> fetch({int limit = 50}) async {
+    fetches++;
+    final f = failWith;
+    if (f != null) throw f;
+    return entries;
   }
 }
