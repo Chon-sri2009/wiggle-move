@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
 import 'shared/env.dart';
 import 'shared/env_error_screen.dart';
+import 'shared/legacy_data_migration.dart';
 import 'shared/prefs.dart';
 
 Future<void> main() async {
@@ -42,6 +43,7 @@ Future<void> main() async {
   // Pose scoring assumes a portrait camera image.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final prefs = await SharedPreferences.getInstance();
+  await migrateLegacyData(prefs, offline: Env.offline);
   runApp(
     ProviderScope(
       overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
