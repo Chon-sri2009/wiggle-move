@@ -4,12 +4,14 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/backend/sessions_providers.dart';
 import '../../shared/uuid.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/backend/content_models.dart';
+import '../../shared/backend/routine_video.dart';
 import '../summary/summary_screen.dart';
 import 'camera_failure.dart';
 import 'play_clock.dart';
@@ -328,6 +330,17 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                     _session.isResting
                         ? _RestPanel(session: _session)
                         : _MovePanel(session: _session, live: _live),
+                  if (active &&
+                      routineVideoUrl(widget.routine.videoPath) != null)
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + kToolbarHeight,
+                      right: 12,
+                      width: 120,
+                      child: _Clip(
+                        url: routineVideoUrl(widget.routine.videoPath)!,
+                        playing: !_paused && !_session.isResting,
+                      ),
+                    ),
                   if (_paused && active)
                     _PausedPanel(onResume: _resume, onQuit: _askQuit),
                 ],
@@ -354,6 +367,71 @@ class _Preview extends StatelessWidget {
             height: size.width,
             child: CameraPreview(camera),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The routine's demonstration clip: muted, looping, playing only while the
+/// workout runs. Shows nothing if the video cannot load (the workout never
+/// depends on it).
+class _Clip extends StatefulWidget {
+  const _Clip({required this.url, required this.playing});
+  final String url;
+  final bool playing;
+
+  @override
+  State<_Clip> createState() => _ClipState();
+}
+
+class _ClipState extends State<_Clip> {
+  late final VideoPlayerController _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller
+        .initialize()
+        .then((_) async {
+          await _controller.setLooping(true);
+          await _controller.setVolume(0);
+          if (!mounted) return;
+          setState(() => _ready = true);
+          _sync();
+        })
+        .catchError((_) {});
+  }
+
+  @override
+  void didUpdateWidget(_Clip old) {
+    super.didUpdateWidget(old);
+    if (old.playing != widget.playing) _sync();
+  }
+
+  void _sync() {
+    if (!_ready) return;
+    widget.playing ? _controller.play() : _controller.pause();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) return const SizedBox.shrink();
+    return Semantics(
+      label: 'Demonstration video',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: VideoPlayer(_controller),
         ),
       ),
     );

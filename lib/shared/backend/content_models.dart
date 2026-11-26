@@ -76,6 +76,7 @@ class Routine {
     this.sets = 1,
     this.restMs = 0,
     this.met = 3.5,
+    this.videoPath,
   });
   static const dance = 'dance';
   static const cardio = 'cardio';
@@ -95,6 +96,10 @@ class Routine {
 
   /// Intensity for the calorie estimate (see `estimateCalories`).
   final double met;
+
+  /// Object path in the `routine-videos` bucket (see `routineVideoUrl`); null
+  /// = no demonstration video.
+  final String? videoPath;
 
   bool get isCardio => category == cardio;
 
@@ -116,6 +121,7 @@ class Routine {
     'sets': sets,
     'rest_ms': restMs,
     'met': met,
+    if (videoPath != null) 'video_path': videoPath,
     'moves': [for (final m in moves) m.toJson()],
   };
 }
@@ -221,6 +227,7 @@ Routine _routine(Object? json, {required bool sorted}) => _parse('routine', () {
     sets: _intOr(m['sets'], 1, min: 1),
     restMs: _intOr(m['rest_ms'], 0, min: 0),
     met: _metOr(m['met']),
+    videoPath: _optionalString(m['video_path']),
     moves: [
       for (final mv in sorted ? _sortedBy(moves, 'idx') : moves)
         Move.fromJson(mv),
