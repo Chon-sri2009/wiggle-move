@@ -118,6 +118,35 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
+  testWidgets('the Cardio chip asks for that category and narrows routines', (
+    tester,
+  ) async {
+    final board = FakeLeaderboardRepository([_r(1, 'Bo', 9)]);
+    await _pump(tester, board);
+    expect(find.widgetWithText(ChoiceChip, 'Pop Starter'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Squat Sets'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Cardio'));
+    await tester.pumpAndSettle();
+    expect(board.categories.last, 'cardio');
+    expect(find.widgetWithText(ChoiceChip, 'Pop Starter'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, 'Squat Sets'), findsOneWidget);
+
+    // Picking a routine keeps the category; changing category clears it.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Squat Sets'));
+    await tester.pumpAndSettle();
+    expect(board.calls.last.routineId, 'squat-sets');
+    expect(board.categories.last, 'cardio');
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dance'));
+    await tester.pumpAndSettle();
+    expect(board.calls.last.routineId, isNull);
+    expect(board.categories.last, 'dance');
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'All types'));
+    await tester.pumpAndSettle();
+    expect(board.categories.last, isNull);
+  });
+
   testWidgets('switching period and routine refetches with those params', (
     tester,
   ) async {

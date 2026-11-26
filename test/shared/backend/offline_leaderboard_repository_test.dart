@@ -132,9 +132,34 @@ void main() {
       return OfflineLeaderboardRepository(
         await SharedPreferences.getInstance(),
         playerName: () => me,
+        routineIdsIn: (category) async => category == 'cardio' ? {'b'} : {'a'},
         now: () => _now,
       );
     }
+
+    test('a category counts only the routines of that category', () async {
+      final r = await repo({
+        localLeaderboardKey: jsonEncode([
+          _p('Ann', 'a', 70).toJson(),
+          _p('Ann', 'b', 40).toJson(),
+          _p('Bo', 'b', 60).toJson(),
+        ]),
+      });
+      // 'b' is the cardio routine: Bo 60 beats Ann 40; Ann's dance 70 is out.
+      expect(
+        _show(await r.fetch(period: LeaderboardPeriod.all, category: 'cardio')),
+        ['1:Bo:60', '2:Ann:40*'],
+      );
+      expect(
+        _show(await r.fetch(period: LeaderboardPeriod.all, category: 'dance')),
+        ['1:Ann:70*'],
+      );
+      // No category: everything, as before (Ann 70 + 40 = 110).
+      expect(_show(await r.fetch(period: LeaderboardPeriod.all)), [
+        '1:Ann:110*',
+        '2:Bo:60',
+      ]);
+    });
 
     test('reads the plays stored by OfflineSessionsRepository', () async {
       final r = await repo({

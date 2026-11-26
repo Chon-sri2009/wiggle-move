@@ -5,8 +5,13 @@ import '../../shared/backend/leaderboard_providers.dart';
 import '../../shared/backend/leaderboard_repository.dart';
 import '../../shared/backend/sessions_providers.dart';
 
-/// What the leaderboard shows: one routine (null = global) in one period.
-typedef LeaderboardQuery = ({String? routineId, LeaderboardPeriod period});
+/// What the leaderboard shows: one routine (null = global) in one period,
+/// optionally only routines of a category (null = all).
+typedef LeaderboardQuery = ({
+  String? routineId,
+  LeaderboardPeriod period,
+  String? category,
+});
 
 /// Rows for [query]. One provider per query, so a slow response for an
 /// earlier selection can never replace the one now on screen. Refetches
@@ -26,6 +31,10 @@ final leaderboardProvider = FutureProvider.autoDispose
         );
         return ref
             .watch(leaderboardRepositoryProvider)
-            .fetch(routineId: query.routineId, period: query.period);
+            .fetch(
+              routineId: query.routineId,
+              period: query.period,
+              category: query.category,
+            );
       },
     );

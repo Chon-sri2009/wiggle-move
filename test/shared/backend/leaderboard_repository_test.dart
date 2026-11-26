@@ -96,6 +96,7 @@ void main() {
         'p_routine_id': 'mia-pop',
         'p_period': 'week',
         'p_limit': 20,
+        'p_category': null,
       });
     });
 
@@ -106,7 +107,14 @@ void main() {
         'p_routine_id': null,
         'p_period': 'all',
         'p_limit': 50,
+        'p_category': null,
       });
+    });
+
+    test('a category is sent as p_category', () async {
+      final r = repo(() => const []);
+      await r.fetch(period: LeaderboardPeriod.all, category: 'cardio');
+      expect(calls.single.$2['p_category'], 'cardio');
     });
 
     test('a malformed response is a generic failure', () async {

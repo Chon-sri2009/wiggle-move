@@ -30,12 +30,14 @@ class SupabaseLeaderboardRepository implements LeaderboardRepository {
     String? routineId,
     required LeaderboardPeriod period,
     int limit = 50,
+    String? category,
   }) async {
     try {
       final data = await _rpc(functionName, {
         'p_routine_id': routineId,
         'p_period': period.name,
         'p_limit': limit,
+        'p_category': category,
       }).timeout(timeout);
       return leaderboardRowsFromJson(data);
     } catch (e) {

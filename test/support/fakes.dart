@@ -191,6 +191,9 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
 
   List<LeaderboardRow> rows;
   final calls = <({String? routineId, LeaderboardPeriod period})>[];
+
+  /// The category asked for in each call (parallel to [calls]).
+  final categories = <String?>[];
   RepositoryFailure? failWith;
   Completer<void>? gate;
   Map<({String? routineId, LeaderboardPeriod period}), List<LeaderboardRow>>
@@ -201,9 +204,11 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
     String? routineId,
     required LeaderboardPeriod period,
     int limit = 50,
+    String? category,
   }) async {
     final q = (routineId: routineId, period: period);
     calls.add(q);
+    categories.add(category);
     await gate?.future;
     final f = failWith;
     if (f != null) throw f;

@@ -61,10 +61,13 @@ List<LeaderboardRow> leaderboardRowsFromJson(Object? json) {
 /// [fetch] throws [RepositoryFailure] on error.
 abstract class LeaderboardRepository {
   /// Top [limit] rows for [routineId] (global when null) in [period], plus
-  /// the caller's own row when it is outside the top.
+  /// the caller's own row when it is outside the top. [category] (`dance` or
+  /// `cardio`, see `Routine.categories`) counts only that kind of routine;
+  /// null counts all.
   Future<List<LeaderboardRow>> fetch({
     String? routineId,
     required LeaderboardPeriod period,
     int limit = 50,
+    String? category,
   });
 }

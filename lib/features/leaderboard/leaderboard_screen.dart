@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/backend/content_models.dart';
 import '../../shared/backend/leaderboard_repository.dart';
 import '../../shared/backend/profile_repository.dart';
 import '../../shared/widgets/async_states.dart';
@@ -16,9 +17,17 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   String? _routineId;
+  String? _category;
   LeaderboardPeriod _period = LeaderboardPeriod.all;
 
-  LeaderboardQuery get _query => (routineId: _routineId, period: _period);
+  LeaderboardQuery get _query =>
+      (routineId: _routineId, period: _period, category: _category);
+
+  void _pickCategory(String? category) => setState(() {
+    _category = category;
+    // The routine chips only offer this category's routines.
+    _routineId = null;
+  });
 
   Future<void> _refresh() async {
     final provider = leaderboardProvider(_query);
@@ -36,7 +45,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     // Content may still be loading: routine chips appear once it is there.
     final routines = [
       for (final t in ref.watch(trainersProvider).value?.trainers ?? const [])
-        ...t.routines,
+        for (final r in t.routines)
+          if (_category == null || r.category == _category) r,
     ];
 
     return Scaffold(
@@ -58,6 +68,30 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               ],
               selected: {_period},
               onSelectionChanged: (s) => setState(() => _period = s.first),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('All types'),
+                  selected: _category == null,
+                  onSelected: (_) => _pickCategory(null),
+                ),
+                ChoiceChip(
+                  label: const Text('Dance'),
+                  selected: _category == Routine.dance,
+                  onSelected: (_) => _pickCategory(Routine.dance),
+                ),
+                ChoiceChip(
+                  label: const Text('Cardio'),
+                  selected: _category == Routine.cardio,
+                  onSelected: (_) => _pickCategory(Routine.cardio),
+                ),
+              ],
             ),
           ),
           SingleChildScrollView(

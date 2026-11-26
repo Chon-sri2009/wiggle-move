@@ -9,10 +9,12 @@ import 'offline_sessions_repository.dart';
 /// of their best per routine. Ties share a rank (the next rank skips) and
 /// are listed by who reached the score first, then by name. The top [limit]
 /// (1..100) are returned, plus [me] when outside them. [period] `week` keeps
-/// plays since Monday 00:00 UTC of [now].
+/// plays since Monday 00:00 UTC of [now]. [routineIds], when given, keeps
+/// only plays of those routines (a category).
 List<LeaderboardRow> computeLocalLeaderboard(
   List<LocalPlay> plays, {
   String? routineId,
+  Set<String>? routineIds,
   required LeaderboardPeriod period,
   required int limit,
   required String? me,
@@ -23,6 +25,7 @@ List<LeaderboardRow> computeLocalLeaderboard(
   final best = <String, Map<String, LocalPlay>>{};
   for (final p in plays) {
     if (routineId != null && p.routineId != routineId) continue;
+    if (routineIds != null && !routineIds.contains(p.routineId)) continue;
     if (since != null && p.playedAt.toUtc().isBefore(since)) continue;
     final mine = best.putIfAbsent(_name(p.playerName), () => {});
     final current = mine[p.routineId];
@@ -91,11 +94,15 @@ class OfflineLeaderboardRepository implements LeaderboardRepository {
   OfflineLeaderboardRepository(
     this._prefs, {
     required this.playerName,
+    required this.routineIdsIn,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
   final SharedPreferences _prefs;
   final String? Function() playerName;
+
+  /// Ids of the routines of a category (the content is not known here).
+  final Future<Set<String>> Function(String category) routineIdsIn;
   final DateTime Function() _now;
 
   @override
@@ -103,9 +110,11 @@ class OfflineLeaderboardRepository implements LeaderboardRepository {
     String? routineId,
     required LeaderboardPeriod period,
     int limit = 50,
+    String? category,
   }) async => computeLocalLeaderboard(
     readLocalPlays(_prefs),
     routineId: routineId,
+    routineIds: category == null ? null : await routineIdsIn(category),
     period: period,
     limit: limit,
     me: playerName(),

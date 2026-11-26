@@ -33,7 +33,11 @@ Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
         OfflineHistoryRepository(instance, playerName: () => 'Ann'),
       ),
       leaderboardRepositoryProvider.overrideWithValue(
-        OfflineLeaderboardRepository(instance, playerName: () => 'Ann'),
+        OfflineLeaderboardRepository(
+          instance,
+          playerName: () => 'Ann',
+          routineIdsIn: (_) async => const {},
+        ),
       ),
     ],
     child: const WiggleMoveApp(),
