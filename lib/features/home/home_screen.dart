@@ -7,7 +7,11 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/backend/auth_providers.dart';
 import '../../shared/backend/content_models.dart';
 import '../../shared/widgets/async_states.dart';
+import '../../shared/backend/profile.dart';
+import '../../shared/backend/trainer_photo.dart';
+import '../profile/profile_store.dart';
 import '../trainers/content_gate.dart';
+import '../trainers/personalization.dart';
 import '../trainers/trainers_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -18,6 +22,8 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final name = ref.watch(authUserProvider)?.displayName ?? '';
     final content = ref.watch(trainersProvider);
+    // Home is only reachable once the profile loaded; default = no ranking.
+    final profile = ref.watch(profileProvider).value ?? const Profile();
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -66,8 +72,11 @@ class HomeScreen extends ConsumerWidget {
             ...switch (content) {
               AsyncValue(:final value?) => [
                 if (value.isStale) const _StaleNote(),
-                for (final trainer in value.trainers)
-                  _TrainerCard(trainer: trainer),
+                for (final trainer in rankTrainers(value.trainers, profile))
+                  _TrainerCard(
+                    trainer: trainer,
+                    recommended: trainerRecommended(trainer, profile),
+                  ),
               ],
               AsyncValue(:final error?) => [
                 ErrorView(
@@ -89,6 +98,44 @@ String trainerInitial(String name) {
   final words = name.trim().split(RegExp(r'\s+'));
   final last = words.last;
   return last.isEmpty ? '?' : last.characters.first;
+}
+
+/// The trainer's photo from Storage; the colored initial while there is no
+/// photo, offline, or when the image fails to load.
+class TrainerAvatar extends StatefulWidget {
+  const TrainerAvatar({super.key, required this.trainer, this.radius = 28});
+  final Trainer trainer;
+  final double radius;
+
+  @override
+  State<TrainerAvatar> createState() => _TrainerAvatarState();
+}
+
+class _TrainerAvatarState extends State<TrainerAvatar> {
+  bool _failed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = trainerPhotoUrl(widget.trainer.photoPath);
+    return CircleAvatar(
+      radius: widget.radius,
+      backgroundColor: widget.trainer.color,
+      backgroundImage: url == null || _failed ? null : NetworkImage(url),
+      onBackgroundImageError: url == null || _failed
+          ? null
+          : (_, _) => setState(() => _failed = true),
+      child: url == null || _failed
+          ? Text(
+              trainerInitial(widget.trainer.name),
+              style: TextStyle(
+                color: AppColors.primary,
+                fontSize: widget.radius * 0.85,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          : null,
+    );
+  }
 }
 
 class _StaleNote extends StatelessWidget {
@@ -113,8 +160,9 @@ class _StaleNote extends StatelessWidget {
 }
 
 class _TrainerCard extends StatelessWidget {
-  const _TrainerCard({required this.trainer});
+  const _TrainerCard({required this.trainer, required this.recommended});
   final Trainer trainer;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -123,18 +171,7 @@ class _TrainerCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          radius: 28,
-          backgroundColor: trainer.color,
-          child: Text(
-            trainerInitial(trainer.name),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
+        leading: TrainerAvatar(trainer: trainer),
         title: Text(
           trainer.name,
           style: theme.textTheme.titleLarge?.copyWith(
@@ -142,7 +179,8 @@ class _TrainerCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${trainer.style} · ${trainer.routines.length} routines',
+          '${trainer.style} · ${trainer.routines.length} routines'
+          '${recommended ? ' · Recommended' : ''}',
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/trainer/${trainer.id}'),

@@ -127,12 +127,17 @@ class Trainer {
     required this.style,
     required this.color,
     required this.routines,
+    this.photoPath,
   });
   final String id;
   final String name;
   final String style;
   final Color color;
   final List<Routine> routines;
+
+  /// Object path in the `trainer-photos` Storage bucket (see
+  /// `trainerPhotoUrl`); null = no photo, the avatar shows the initial.
+  final String? photoPath;
 
   /// One `trainers` row with embedded `routines(*, moves(*))`.
   factory Trainer.fromRow(Object? row) => _trainer(row, sorted: true);
@@ -144,6 +149,7 @@ class Trainer {
     'name': name,
     'style': style,
     'color': color.toARGB32(),
+    if (photoPath != null) 'photo_path': photoPath,
     'routines': [for (final r in routines) r.toJson()],
   };
 }
@@ -192,6 +198,7 @@ Trainer _trainer(Object? json, {required bool sorted}) => _parse('trainer', () {
     name: name,
     style: m['style'] as String,
     color: Color(color),
+    photoPath: _optionalString(m['photo_path']),
     routines: [
       for (final r in sorted ? _sortedBy(routines, 'sort_order') : routines)
         _routine(r, sorted: sorted),
@@ -279,6 +286,13 @@ Map<String, Object?> _map(Object? json) =>
     (json as Map).cast<String, Object?>();
 
 List<Object?> _list(Object? json) => (json as List).cast<Object?>();
+
+/// A string, or null when absent/empty; any other type is malformed.
+String? _optionalString(Object? v) {
+  if (v == null) return null;
+  final s = v as String;
+  return s.isEmpty ? null : s;
+}
 
 int _positiveInt(Object? value) {
   final v = value as int;

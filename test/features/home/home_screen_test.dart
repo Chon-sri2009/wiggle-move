@@ -7,6 +7,7 @@ import 'package:wiggle_move/features/home/home_screen.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/content_cache.dart';
 import 'package:wiggle_move/shared/backend/content_providers.dart';
+import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_providers.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
 import 'package:wiggle_move/shared/backend/trainer_data.dart';
@@ -18,6 +19,7 @@ import '../../support/fakes.dart';
 Future<Widget> _app(
   FakeContentRepository content, {
   bool cached = false,
+  Profile? profile,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
@@ -28,7 +30,9 @@ Future<Widget> _app(
       sharedPrefsProvider.overrideWithValue(prefs),
       authRepositoryProvider.overrideWithValue(auth),
       profileRepositoryProvider.overrideWithValue(
-        FakeProfileRepository(auth, {'u1': FakeProfileRepository.onboarded}),
+        FakeProfileRepository(auth, {
+          'u1': profile ?? FakeProfileRepository.onboarded,
+        }),
       ),
       contentRepositoryProvider.overrideWithValue(content),
     ],
@@ -37,6 +41,42 @@ Future<Widget> _app(
 }
 
 void main() {
+  testWidgets('home lists the best-fitting trainer first and marks it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      await _app(
+        FakeContentRepository(),
+        profile: const Profile(
+          level: 'Beginner',
+          styles: ['Cardio'],
+          onboarded: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final jay = tester.getTopLeft(find.text('Coach Jay')).dy;
+    final mia = tester.getTopLeft(find.text('Coach Mia')).dy;
+    expect(jay, lessThan(mia));
+    expect(find.textContaining('Recommended'), findsOneWidget);
+  });
+
+  testWidgets('without profile answers Home keeps the server order', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      await _app(
+        FakeContentRepository(),
+        profile: const Profile(onboarded: true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final jay = tester.getTopLeft(find.text('Coach Jay')).dy;
+    final mia = tester.getTopLeft(find.text('Coach Mia')).dy;
+    expect(mia, lessThan(jay));
+    expect(find.textContaining('Recommended'), findsNothing);
+  });
+
   testWidgets('home shows trainers from the content repository', (
     tester,
   ) async {

@@ -156,6 +156,7 @@ List<Map<String, Object?>> seedRows() => [
     'name': 'Coach Jay',
     'style': 'Cardio burn',
     'color': 4279950273,
+    'photo_path': null,
     'sort_order': 1,
     'routines': [
       _routine(
