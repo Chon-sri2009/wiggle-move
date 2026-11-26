@@ -6,36 +6,8 @@ import '../../app/theme.dart';
 import '../../shared/backend/profile_repository.dart';
 import '../../shared/widgets/app_snackbar.dart';
 import '../../shared/widgets/primary_button.dart';
+import 'profile_options.dart';
 import 'profile_store.dart';
-
-class _Option {
-  const _Option(this.label, this.icon, [this.subtitle]);
-  final String label;
-  final IconData icon;
-  final String? subtitle;
-}
-
-const _goals = [
-  _Option('Burn Calories', Icons.local_fire_department),
-  _Option('Build Strength', Icons.front_hand),
-  _Option('Improve Fitness', Icons.monitor_heart),
-  _Option('Improve Flexibility', Icons.directions_run),
-  _Option('Weight Management', Icons.monitor_weight),
-  _Option('Stay Healthy', Icons.health_and_safety),
-];
-
-const _styles = [
-  _Option('Dance Workout', Icons.accessibility_new),
-  _Option('Cardio', Icons.favorite),
-  _Option('Bodyweight', Icons.fitness_center),
-  _Option('Stretching', Icons.eco),
-];
-
-const _levels = [
-  _Option('Beginner', Icons.child_care, "I'm just getting started."),
-  _Option('Intermediate', Icons.accessibility_new, 'I work out occasionally.'),
-  _Option('Advanced', Icons.person, 'I know various workout techniques.'),
-];
 
 /// Figma "Personalization" flow: intro, then 01 goal, 02 style, 03 level.
 class PersonalizeScreen extends ConsumerStatefulWidget {
@@ -180,20 +152,20 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
 
   Widget _stepBody() => switch (_step) {
     1 => _Grid(
-      options: _goals,
+      options: goalOptions,
       columns: 3,
       selected: _goalSel,
       onTap: (v) => _toggle(_goalSel, v),
     ),
     2 => _Grid(
-      options: _styles,
+      options: styleOptions,
       columns: 2,
       selected: _styleSel,
       onTap: (v) => _toggle(_styleSel, v),
     ),
     _ => Column(
       children: [
-        for (final o in _levels)
+        for (final o in levelOptions)
           _LevelRow(
             option: o,
             selected: _level == o.label,
@@ -211,7 +183,7 @@ class _Grid extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final List<_Option> options;
+  final List<ProfileOption> options;
   final int columns;
   final Set<String> selected;
   final ValueChanged<String> onTap;
@@ -252,7 +224,7 @@ class _Tile extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _Option option;
+  final ProfileOption option;
   final bool selected;
   final VoidCallback onTap;
 
@@ -295,7 +267,7 @@ class _LevelRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _Option option;
+  final ProfileOption option;
   final bool selected;
   final VoidCallback onTap;
 

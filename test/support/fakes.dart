@@ -19,6 +19,8 @@ class FakeAuthRepository implements AuthRepository {
   AppUser? _user;
   AuthFailure? failWith;
   final resetRequests = <String>[];
+  final nameUpdates = <String>[];
+  int deletes = 0;
   final _changes = StreamController<AppUser?>.broadcast();
 
   @override
@@ -65,6 +67,21 @@ class FakeAuthRepository implements AuthRepository {
     _check();
     resetRequests.add(email);
   }
+
+  @override
+  Future<void> updateDisplayName(String name) async {
+    _check();
+    nameUpdates.add(name);
+    final u = _user!;
+    emit(AppUser(id: u.id, email: u.email, displayName: name));
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    _check();
+    deletes++;
+    emit(null);
+  }
 }
 
 /// In-memory [ProfileRepository] keyed by the signed-in user of [auth], like
@@ -86,6 +103,8 @@ class FakeProfileRepository implements ProfileRepository {
   Completer<void>? loadGate;
   RepositoryFailure? failLoad;
   RepositoryFailure? failSave;
+  RepositoryFailure? failName;
+  final names = <String>[];
   int loads = 0;
 
   String get _uid => auth.currentUser!.id;
@@ -106,6 +125,13 @@ class FakeProfileRepository implements ProfileRepository {
     final f = failSave;
     if (f != null) throw f;
     profiles[_uid] = profile;
+  }
+
+  @override
+  Future<void> saveDisplayName(String name) async {
+    final f = failName;
+    if (f != null) throw f;
+    names.add(name);
   }
 }
 

@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:supabase_flutter/supabase_flutter.dart'
-    show AuthException, AuthRetryableFetchException;
+    show AuthException, AuthRetryableFetchException, FunctionsFetchException;
 
 /// The signed-in user as the app sees it.
 class AppUser {
@@ -48,6 +51,11 @@ class AuthFailure implements Exception {
 /// Maps any auth error to an [AuthFailure]. Raw server text is never used.
 AuthFailure mapAuthException(Object error) {
   if (error is AuthFailure) return error;
+  if (error is SocketException ||
+      error is TimeoutException ||
+      error is FunctionsFetchException) {
+    return const AuthFailure(AuthFailure.network);
+  }
   if (error is! AuthException) return const AuthFailure(AuthFailure.generic);
   // Network failures are wrapped by gotrue as AuthRetryableFetchException
   // (no status code, no error code).
@@ -95,4 +103,10 @@ abstract class AuthRepository {
   Future<void> signOut();
 
   Future<void> sendPasswordReset(String email);
+
+  /// Changes the name the app shows for the signed-in user.
+  Future<void> updateDisplayName(String name);
+
+  /// Permanently deletes the signed-in account and its data, then signs out.
+  Future<void> deleteAccount();
 }

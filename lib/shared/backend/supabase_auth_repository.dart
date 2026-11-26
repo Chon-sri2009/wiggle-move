@@ -5,9 +5,17 @@ import 'auth_repository.dart';
 /// Email/password accounts on Supabase Auth. The session is persisted and
 /// restored by supabase_flutter itself.
 class SupabaseAuthRepository implements AuthRepository {
-  SupabaseAuthRepository(this._auth);
+  SupabaseAuthRepository(
+    this._auth,
+    this._functions, {
+    this.timeout = const Duration(seconds: 20),
+  });
+
+  static const deleteFunctionName = 'delete_account';
 
   final GoTrueClient _auth;
+  final FunctionsClient _functions;
+  final Duration timeout;
 
   @override
   AppUser? get currentUser => toAppUser(_auth.currentUser);
@@ -41,7 +49,24 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> sendPasswordReset(String email) =>
       _guard(() => _auth.resetPasswordForEmail(email));
 
-  static Future<void> _guard(Future<Object?> Function() call) async {
+  @override
+  Future<void> updateDisplayName(String name) => _guard(
+    () => _auth.updateUser(UserAttributes(data: {'display_name': name})),
+  );
+
+  /// The `delete_account` Edge Function removes the auth user (the profile,
+  /// sessions and results cascade). The local session is then dropped; the
+  /// server no longer knows it, so only this device is signed out.
+  @override
+  Future<void> deleteAccount() => _guard(() async {
+    final res = await _functions.invoke(deleteFunctionName).timeout(timeout);
+    if (res.status < 200 || res.status >= 300) {
+      throw const AuthFailure(AuthFailure.generic);
+    }
+    await _auth.signOut(scope: SignOutScope.local);
+  });
+
+  static Future<void> _guard(Future<void> Function() call) async {
     try {
       await call();
     } catch (e) {

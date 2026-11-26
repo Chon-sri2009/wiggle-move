@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../legacy_data_migration.dart';
 import 'auth_repository.dart';
 
 // Same key the pre-Supabase app used, so existing dev installs stay signed in.
@@ -52,6 +53,21 @@ class OfflineAuthRepository implements AuthRepository {
 
   @override
   Future<void> sendPasswordReset(String email) async {}
+
+  @override
+  Future<void> updateDisplayName(String name) async {
+    await _prefs.setString(_nameKey, name);
+    _changes.add(currentUser);
+  }
+
+  /// Clears everything this device stored for the offline account.
+  @override
+  Future<void> deleteAccount() async {
+    for (final key in legacyLocalKeys) {
+      await _prefs.remove(key);
+    }
+    _changes.add(null);
+  }
 
   Future<void> _store(String email, String name) async {
     await _prefs.setString(_nameKey, name);

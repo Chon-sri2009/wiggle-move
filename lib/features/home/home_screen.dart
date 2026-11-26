@@ -5,9 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/backend/auth_providers.dart';
-import '../../shared/backend/auth_repository.dart';
 import '../../shared/backend/content_models.dart';
-import '../../shared/widgets/app_snackbar.dart';
 import '../../shared/widgets/async_states.dart';
 import '../trainers/content_gate.dart';
 import '../trainers/trainers_provider.dart';
@@ -35,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Profile',
             icon: const Icon(Icons.account_circle, size: 28),
-            onPressed: () => _showProfile(context, ref, name),
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
@@ -76,39 +74,6 @@ class HomeScreen extends ConsumerWidget {
             },
           ],
         ),
-      ),
-    );
-  }
-
-  static Future<void> _showProfile(
-    BuildContext context,
-    WidgetRef ref,
-    String name,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(name),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              try {
-                await ref.read(authRepositoryProvider).signOut();
-              } on AuthFailure catch (e) {
-                if (context.mounted) {
-                  showAppSnackBar(context, e.message, isError: true);
-                }
-              }
-            },
-            child: const Text('Sign out'),
-          ),
-        ],
       ),
     );
   }

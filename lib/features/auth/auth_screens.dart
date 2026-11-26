@@ -246,6 +246,7 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
   final _form = GlobalKey<FormState>();
   late final _email = TextEditingController(text: widget.initialEmail);
   bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -255,7 +256,10 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
 
   Future<void> _send() async {
     if (_busy || !_form.currentState!.validate()) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref
@@ -271,9 +275,12 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
         ),
       );
     } on AuthFailure catch (e) {
+      // Shown in the dialog: a snackbar would appear behind it.
       if (mounted) {
-        setState(() => _busy = false);
-        showAppSnackBar(context, e.message, isError: true);
+        setState(() {
+          _busy = false;
+          _error = e.message;
+        });
       }
     }
   }
@@ -284,11 +291,24 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
       title: const Text('Reset password'),
       content: Form(
         key: _form,
-        child: AppTextField(
-          controller: _email,
-          keyboardType: TextInputType.emailAddress,
-          hint: 'Email',
-          validator: validateEmail,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppTextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              hint: 'Email',
+              validator: validateEmail,
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
         ),
       ),
       actions: [

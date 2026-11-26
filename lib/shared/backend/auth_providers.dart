@@ -13,7 +13,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   if (Env.offline) {
     return OfflineAuthRepository(ref.watch(sharedPrefsProvider));
   }
-  return SupabaseAuthRepository(Supabase.instance.client.auth);
+  final client = Supabase.instance.client;
+  return SupabaseAuthRepository(client.auth, client.functions);
 });
 
 /// The signed-in user (null when signed out). Seeded synchronously from the

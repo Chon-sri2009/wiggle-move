@@ -10,7 +10,7 @@ class SupabaseProfileRepository implements ProfileRepository {
 
   final SupabaseClient _client;
 
-  static const _columns = 'goals, styles, level, onboarded';
+  static const _columns = 'goals, styles, level, avatar, onboarded';
 
   String get _uid {
     final id = _client.auth.currentUser?.id;
@@ -40,7 +40,19 @@ class SupabaseProfileRepository implements ProfileRepository {
         .select('id');
     // An update that matches no row succeeds silently; don't report success.
     if (rows.isEmpty) {
-      throw const RepositoryFailure(RepositoryFailure.generic);
+      throw const RepositoryFailure(RepositoryFailure.profileMissing);
+    }
+  });
+
+  @override
+  Future<void> saveDisplayName(String name) => _guard(() async {
+    final rows = await _client
+        .from('profiles')
+        .update({'display_name': name})
+        .eq('id', _uid)
+        .select('id');
+    if (rows.isEmpty) {
+      throw const RepositoryFailure(RepositoryFailure.profileMissing);
     }
   });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/backend/auth_providers.dart';
 import '../../shared/backend/profile_repository.dart';
 import '../../shared/widgets/async_states.dart';
 import 'profile_store.dart';
@@ -18,11 +19,22 @@ class ProfileLoadingScreen extends ConsumerWidget {
       body: SafeArea(
         child: profile.isLoading || error == null
             ? const LoadingView()
-            : ErrorView(
-                message: error is RepositoryFailure
-                    ? error.message
-                    : RepositoryFailure.generic,
-                onRetry: () => ref.invalidate(profileProvider),
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ErrorView(
+                    message: error is RepositoryFailure
+                        ? error.message
+                        : RepositoryFailure.generic,
+                    onRetry: () => ref.invalidate(profileProvider),
+                  ),
+                  // A way out when the profile never loads.
+                  TextButton(
+                    onPressed: () =>
+                        ref.read(authRepositoryProvider).signOut().ignore(),
+                    child: const Text('Sign out'),
+                  ),
+                ],
               ),
       ),
     );

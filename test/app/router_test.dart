@@ -107,6 +107,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Sign out'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(auth.currentUser, isNull);
@@ -163,6 +168,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(auth.resetRequests, ['ann@x.com']);
     expect(find.textContaining('If an account exists'), findsOneWidget);
+  });
+
+  testWidgets('a failed reset shows its error inside the dialog', (
+    tester,
+  ) async {
+    final auth = FakeAuthRepository()
+      ..failWith = const AuthFailure(AuthFailure.network);
+    await tester.pumpWidget(await _app(auth));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'ann@x.com',
+    );
+    await tester.tap(find.text('Forgot your password?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Send link'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text(AuthFailure.network),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   group('server profile (WM-21)', () {

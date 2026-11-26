@@ -24,12 +24,20 @@ class ProfileNotifier extends AsyncNotifier<Profile> {
     required List<String> styles,
     required String level,
   }) async {
-    final profile = Profile(
-      goals: goals,
-      styles: styles,
-      level: level,
-      onboarded: true,
+    await save(
+      Profile(
+        goals: goals,
+        styles: styles,
+        level: level,
+        avatar: state.value?.avatar,
+        onboarded: true,
+      ),
     );
+  }
+
+  /// Persists [profile] and, once saved, makes it the current one. Throws
+  /// `RepositoryFailure` and leaves the state unchanged if the save fails.
+  Future<void> save(Profile profile) async {
     await ref.read(profileRepositoryProvider).save(profile);
     state = AsyncData(profile);
   }

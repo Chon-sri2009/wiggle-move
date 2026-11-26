@@ -6,6 +6,7 @@ class Profile {
     this.goals = const [],
     this.styles = const [],
     this.level,
+    this.avatar,
     this.onboarded = false,
   });
 
@@ -14,12 +15,16 @@ class Profile {
     goals: List<String>.from(row['goals'] as List? ?? const []),
     styles: List<String>.from(row['styles'] as List? ?? const []),
     level: row['level'] as String?,
+    avatar: row['avatar'] as String?,
     onboarded: row['onboarded'] as bool? ?? false,
   );
 
   final List<String> goals;
   final List<String> styles;
   final String? level;
+
+  /// One of `avatarChoices` (a preset emoji), or null for the initial.
+  final String? avatar;
   final bool onboarded;
 
   /// The columns written on save; all are in the client UPDATE grant.
@@ -27,6 +32,7 @@ class Profile {
     'goals': goals,
     'styles': styles,
     'level': level,
+    'avatar': avatar,
     'onboarded': onboarded,
   };
 
@@ -36,6 +42,7 @@ class Profile {
       listEquals(other.goals, goals) &&
       listEquals(other.styles, styles) &&
       other.level == level &&
+      other.avatar == avatar &&
       other.onboarded == onboarded;
 
   @override
@@ -43,11 +50,12 @@ class Profile {
     Object.hashAll(goals),
     Object.hashAll(styles),
     level,
+    avatar,
     onboarded,
   );
 
   @override
   String toString() =>
       'Profile(goals: $goals, styles: $styles, level: $level, '
-      'onboarded: $onboarded)';
+      'avatar: $avatar, onboarded: $onboarded)';
 }

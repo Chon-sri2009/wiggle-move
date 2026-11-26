@@ -11,6 +11,7 @@ const legacyLocalKeys = [
   'profile_goals',
   'profile_styles',
   'profile_level',
+  'profile_avatar',
   'leaderboard_entries',
 ];
 

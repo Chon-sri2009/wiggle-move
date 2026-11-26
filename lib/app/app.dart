@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/profile/personalize_screen.dart';
 import '../features/profile/profile_loading_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/profile/profile_store.dart';
 import '../shared/backend/auth_providers.dart';
 import '../shared/backend/content_models.dart';
@@ -73,6 +74,7 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
     GoRoute(path: '/signup', builder: (c, s) => const AuthScreen(signUp: true)),
     GoRoute(path: '/personalize', builder: (c, s) => const PersonalizeScreen()),
     GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
     GoRoute(
       path: '/trainer/:id',
       builder: (context, state) => ContentGate<Trainer>(

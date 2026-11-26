@@ -16,6 +16,9 @@ class RepositoryFailure implements Exception {
   static const sessionExpired =
       'Your session has expired. Please sign in again.';
   static const generic = 'Something went wrong. Please try again.';
+  static const profileMissing =
+      'Your profile is not set up on the server. Please sign out and sign in '
+      'again; if this keeps happening, contact support.';
 
   @override
   String toString() => 'RepositoryFailure($message)';
@@ -52,4 +55,8 @@ abstract class ProfileRepository {
   Future<Profile> load();
 
   Future<void> save(Profile profile);
+
+  /// Changes the name shown on the leaderboard (1..40 characters, already
+  /// trimmed by the caller).
+  Future<void> saveDisplayName(String name);
 }

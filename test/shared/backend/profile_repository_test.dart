@@ -69,6 +69,7 @@ void main() {
         'goals': ['a'],
         'styles': ['b'],
         'level': 'Advanced',
+        'avatar': null,
         'onboarded': true,
       });
     });

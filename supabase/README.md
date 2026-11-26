@@ -10,6 +10,7 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 | `migrations/20260101000200_leaderboard.sql` | WM-09 `public.leaderboard(...)` security-definer function; `sessions.client_nonce` made `not null`. |
 | `migrations/20260101000300_storage.sql` | WM-11 `routine-videos` Storage bucket (public read, service-role-only writes). |
 | `migrations/20260101000400_submit_session.sql` | WM-10 `public.submit_session_tx(...)`: atomic, idempotent session + move_results insert (service_role only). |
+| `functions/delete_account/` | WM-16 Edge Function: deletes the calling user from Auth (profile, sessions and results cascade). Not run. |
 | `functions/submit_session/` | WM-10 Edge Function: `index.ts` (Deno handler), `validate.ts` (pure validation), `validate.test.ts` (node tests). |
 | `seed.sql` | WM-11 content seed: trainers, routines, moves mirroring `lib/features/trainers/trainer_data.dart`. |
 | `tests/rls_test.sql` | WM-08 pgTAP tests (cross-user reads/writes, anon access, content writes). |
@@ -42,6 +43,7 @@ Edge Function:
 
 ```powershell
 supabase functions deploy submit_session
+supabase functions deploy delete_account
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are

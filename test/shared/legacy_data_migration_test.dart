@@ -14,6 +14,7 @@ const _old = <String, Object>{
   'profile_goals': ['Burn Calories'],
   'profile_styles': ['Cardio'],
   'profile_level': 'Beginner',
+  'profile_avatar': '🐰',
   'leaderboard_entries': '[{"playerName":"Ann"}]',
 };
 
