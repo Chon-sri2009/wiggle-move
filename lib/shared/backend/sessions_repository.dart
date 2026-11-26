@@ -6,6 +6,7 @@ class MoveSubmission {
   const MoveSubmission({
     required this.moveIdx,
     required this.score,
+    this.reps = 0,
     this.worstJoint,
     this.deviation,
   });
@@ -15,6 +16,9 @@ class MoveSubmission {
 
   /// 0–100.
   final int score;
+
+  /// Reps counted over all sets; always 0 for a timed pose.
+  final int reps;
 
   /// `Joint.name` of the joint furthest from target, or null.
   final String? worstJoint;
@@ -26,6 +30,7 @@ class MoveSubmission {
   Map<String, Object?> toPayload() => {
     'move_idx': moveIdx,
     'score': score,
+    'reps': reps,
     'worst_joint': worstJoint,
     'deviation': deviation,
   };
@@ -34,12 +39,15 @@ class MoveSubmission {
     if (json is! Map) return null;
     final idx = json['move_idx'], score = json['score'];
     final joint = json['worst_joint'], dev = json['deviation'];
-    if (idx is! int || score is! int) return null;
+    // Plays queued before reps existed have no key: they counted none.
+    final reps = json['reps'] ?? 0;
+    if (idx is! int || score is! int || reps is! int) return null;
     if (joint != null && joint is! String) return null;
     if (dev != null && dev is! num) return null;
     return MoveSubmission(
       moveIdx: idx,
       score: score,
+      reps: reps,
       worstJoint: joint as String?,
       deviation: (dev as num?)?.toDouble(),
     );
@@ -57,12 +65,16 @@ class SessionSubmission {
     required this.results,
     required this.playedAt,
     required this.userId,
+    this.sets = 1,
   });
 
   final String routineId;
   final String clientNonce;
   final int durationMs;
   final int score;
+
+  /// Sets played; the server expects the routine's own number of sets.
+  final int sets;
   final List<MoveSubmission> results;
   final DateTime playedAt;
 
@@ -76,6 +88,7 @@ class SessionSubmission {
     'client_nonce': clientNonce,
     'duration_ms': durationMs,
     'score': score,
+    'sets': sets,
     'results': [for (final r in results) r.toPayload()],
   };
 
@@ -92,7 +105,9 @@ class SessionSubmission {
     final duration = json['duration_ms'], score = json['score'];
     final user = json['user_id'], at = json['played_at'];
     final raw = json['results'];
-    if (routine is! String ||
+    final sets = json['sets'] ?? 1; // queued before sets existed: one set
+    if (sets is! int ||
+        routine is! String ||
         nonce is! String ||
         duration is! int ||
         score is! int ||
@@ -114,6 +129,7 @@ class SessionSubmission {
       clientNonce: nonce,
       durationMs: duration,
       score: score,
+      sets: sets,
       results: results,
       playedAt: playedAt,
       userId: user,

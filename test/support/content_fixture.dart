@@ -68,7 +68,45 @@ const _templates = <String, (String, String, Map<String, num>)>{
     'Bend your knees, sit back',
     {'leftKnee': 125, 'rightKnee': 125},
   ),
+  '_squats': (
+    'Squats',
+    'Sit back until your knees bend, then stand tall',
+    {'leftKnee': 95, 'rightKnee': 95},
+  ),
+  '_jumpingJacks': (
+    'Jumping Jacks',
+    'Jump feet apart with arms overhead, then back',
+    {
+      'leftShoulder': 160,
+      'rightShoulder': 160,
+      'leftElbow': 170,
+      'rightElbow': 170,
+    },
+  ),
+  '_highKnees': (
+    'High Knees',
+    'Run in place, lifting your left knee to hip height',
+    {'leftHip': 90},
+  ),
 };
+
+// Counted (cardio) moves: duration per set and the rep columns.
+const _counted = <String, (int, Map<String, Object?>)>{
+  '_squats': (
+    30000,
+    {'reps': 12, 'rep_joint': 'leftKnee', 'rep_low': 110, 'rep_high': 160},
+  ),
+  '_jumpingJacks': (
+    20000,
+    {'reps': 20, 'rep_joint': 'leftShoulder', 'rep_low': 50, 'rep_high': 140},
+  ),
+  '_highKnees': (
+    20000,
+    {'reps': 16, 'rep_joint': 'leftHip', 'rep_low': 110, 'rep_high': 160},
+  ),
+};
+
+int _ms(String key) => _counted[key]?.$1 ?? 4000;
 
 Map<String, Object?> _routine(
   String id,
@@ -76,14 +114,22 @@ Map<String, Object?> _routine(
   String name,
   String level,
   int sortOrder,
-  List<String> sequence,
-) => {
+  List<String> sequence, {
+  String category = 'dance',
+  int sets = 1,
+  int restMs = 0,
+  num met = 3.5,
+}) => {
   'id': id,
   'trainer_id': trainerId,
   'name': name,
   'level': level,
+  'category': category,
+  'sets': sets,
+  'rest_ms': restMs,
+  'met': met,
   'video_path': null,
-  'duration_ms': sequence.length * 4000,
+  'duration_ms': sequence.fold<int>(0, (sum, k) => sum + _ms(k)),
   'sort_order': sortOrder,
   'moves': [
     for (var i = sequence.length - 1; i >= 0; i--)
@@ -92,8 +138,13 @@ Map<String, Object?> _routine(
         'idx': i,
         'name': _templates[sequence[i]]!.$1,
         'instruction': _templates[sequence[i]]!.$2,
-        'duration_ms': 4000,
+        'duration_ms': _ms(sequence[i]),
         'target_angles': _templates[sequence[i]]!.$3,
+        'reps': null,
+        'rep_joint': null,
+        'rep_low': null,
+        'rep_high': null,
+        ...?_counted[sequence[i]]?.$2,
       },
   ],
 };
@@ -107,14 +158,47 @@ List<Map<String, Object?>> seedRows() => [
     'color': 4279950273,
     'sort_order': 1,
     'routines': [
-      _routine('cardio-burn', 'jay', 'Cardio Burn', 'Medium', 0, [
-        '_halfSquat',
-        '_armsUp',
-        '_halfSquat',
-        '_flex',
-        '_halfSquat',
-        '_tPose',
-      ]),
+      _routine(
+        'cardio-burn',
+        'jay',
+        'Cardio Burn',
+        'Medium',
+        0,
+        [
+          '_halfSquat',
+          '_armsUp',
+          '_halfSquat',
+          '_flex',
+          '_halfSquat',
+          '_tPose',
+        ],
+        category: 'cardio',
+        met: 6,
+      ),
+      _routine(
+        'squat-sets',
+        'jay',
+        'Squat Sets',
+        'Easy',
+        1,
+        ['_squats'],
+        category: 'cardio',
+        sets: 3,
+        restMs: 20000,
+        met: 5,
+      ),
+      _routine(
+        'cardio-circuit',
+        'jay',
+        'Cardio Circuit',
+        'Medium',
+        2,
+        ['_jumpingJacks', '_squats', '_highKnees'],
+        category: 'cardio',
+        sets: 3,
+        restMs: 30000,
+        met: 8,
+      ),
     ],
   },
   {

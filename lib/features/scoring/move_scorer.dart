@@ -6,10 +6,14 @@ class MoveResult {
     required this.frames,
     this.worstJoint,
     this.worstSignedDeviation,
+    this.reps = 0,
   });
 
   /// 0–100.
   final int score;
+
+  /// Reps counted (0 for timed poses). Summed over sets for a whole move.
+  final int reps;
 
   /// Number of camera frames that contributed.
   final int frames;

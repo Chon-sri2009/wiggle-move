@@ -27,6 +27,12 @@ export const MAX_RESULTS = 200;
 
 export const MAX_ROUTINE_ID_LENGTH = 64;
 
+/**
+ * Reps counted for a move may exceed its target (the counter keeps counting
+ * until the set's time is up), but not by more than this factor over all sets.
+ */
+export const REPS_OVERSHOOT = 3;
+
 /** Raw request body cap (bytes), enforced by index.ts before JSON.parse. */
 export const MAX_BODY_BYTES = 32 * 1024;
 
@@ -45,6 +51,9 @@ export const ERR = Object.freeze({
   invalidDuration: 'invalid_duration',
   implausibleDuration: 'implausible_duration',
   invalidScore: 'invalid_score',
+  invalidSets: 'invalid_sets',
+  setsMismatch: 'sets_mismatch',
+  invalidReps: 'invalid_reps',
   scoreMismatch: 'score_mismatch',
   invalidResults: 'invalid_results',
   moveCountMismatch: 'move_count_mismatch',
@@ -61,6 +70,7 @@ export type ErrorCode = (typeof ERR)[keyof typeof ERR];
 export type MoveResultInput = {
   move_idx: number;
   score: number;
+  reps: number;
   worst_joint: string | null;
   deviation: number | null;
 };
@@ -70,17 +80,30 @@ export type Submission = {
   client_nonce: string;
   duration_ms: number;
   score: number;
+  sets: number;
   results: MoveResultInput[];
 };
 
-export type RoutineInfo = { id: string; durationMs: number; moveCount: number };
+/**
+ * [durationMs] is one set (the sum of the moves); the whole play is
+ * durationMs * sets + restMs * (sets - 1). [repTargets] has one entry per
+ * move: its reps per set, or null for a timed pose.
+ */
+export type RoutineInfo = {
+  id: string;
+  durationMs: number;
+  moveCount: number;
+  sets: number;
+  restMs: number;
+  repTargets: (number | null)[];
+};
 
 export type ValidationResult =
   | { ok: true; value: Submission }
   | { ok: false; error: ErrorCode };
 
-const TOP_KEYS = ['routine_id', 'client_nonce', 'duration_ms', 'score', 'results'];
-const RESULT_KEYS = ['move_idx', 'score', 'worst_joint', 'deviation'];
+const TOP_KEYS = ['routine_id', 'client_nonce', 'duration_ms', 'score', 'sets', 'results'];
+const RESULT_KEYS = ['move_idx', 'score', 'reps', 'worst_joint', 'deviation'];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -119,7 +142,11 @@ export function isValidNonce(v: unknown): v is string {
 export function validateSubmission(payload: unknown, routine: RoutineInfo): ValidationResult {
   if (
     !Number.isInteger(routine.moveCount) || routine.moveCount < 1 ||
-    !Number.isInteger(routine.durationMs) || routine.durationMs < 1
+    !Number.isInteger(routine.durationMs) || routine.durationMs < 1 ||
+    !Number.isInteger(routine.sets) || routine.sets < 1 ||
+    !Number.isInteger(routine.restMs) || routine.restMs < 0 ||
+    !Array.isArray(routine.repTargets) || routine.repTargets.length !== routine.moveCount ||
+    routine.repTargets.some((t) => t !== null && (!Number.isInteger(t) || t < 1))
   ) {
     return fail(ERR.invalidRoutine);
   }
@@ -127,7 +154,7 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
   const keys = keyError(payload, TOP_KEYS);
   if (keys) return fail(keys);
 
-  const { routine_id, client_nonce, duration_ms, score, results } = payload;
+  const { routine_id, client_nonce, duration_ms, score, sets, results } = payload;
 
   if (!isValidRoutineId(routine_id)) return fail(ERR.invalidRoutineId);
   if (routine_id !== routine.id) return fail(ERR.routineMismatch);
@@ -136,9 +163,13 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
 
   if (!Number.isInteger(duration_ms)) return fail(ERR.invalidDuration);
   const d = duration_ms as number;
-  // Plausible: 0.8x..3x the routine length. Integer math (5d >= 4D) keeps
-  // the 0.8x boundary exact.
-  if (d * 5 < routine.durationMs * 4 || d > routine.durationMs * 3) {
+  // The client plays the routine's own number of sets, no more, no fewer.
+  if (!Number.isInteger(sets)) return fail(ERR.invalidSets);
+  if (sets !== routine.sets) return fail(ERR.setsMismatch);
+  // Plausible: 0.8x..3x the whole play (every set plus the rests). Integer
+  // math (5d >= 4D) keeps the 0.8x boundary exact.
+  const total = routine.durationMs * routine.sets + routine.restMs * (routine.sets - 1);
+  if (d * 5 < total * 4 || d > total * 3) {
     return fail(ERR.implausibleDuration);
   }
 
@@ -166,6 +197,15 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
 
     if (!isScore(r.score)) return fail(ERR.invalidMoveScore);
 
+    // Reps are summed over sets. A timed pose counts none; a counted move
+    // cannot plausibly exceed its target by more than REPS_OVERSHOOT.
+    const reps = r.reps;
+    const target = routine.repTargets[idx as number];
+    const maxReps = target === null ? 0 : target * routine.sets * REPS_OVERSHOOT;
+    if (!Number.isInteger(reps) || (reps as number) < 0 || (reps as number) > maxReps) {
+      return fail(ERR.invalidReps);
+    }
+
     const joint = r.worst_joint;
     if (joint !== null && (typeof joint !== 'string' || !JOINT_NAMES.includes(joint))) {
       return fail(ERR.invalidWorstJoint);
@@ -183,6 +223,7 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
     out.push({
       move_idx: idx as number,
       score: r.score,
+      reps: reps as number,
       worst_joint: joint as string | null,
       deviation: dev as number | null,
     });
@@ -203,6 +244,7 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
       client_nonce,
       duration_ms: d,
       score: score as number,
+      sets: sets as number,
       results: out,
     },
   };

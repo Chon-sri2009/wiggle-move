@@ -117,7 +117,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // --- Routine + move count -----------------------------------------------
   const { data: routine, error: routineError } = await admin
     .from('routines')
-    .select('id, duration_ms')
+    .select('id, duration_ms, sets, rest_ms')
     .eq('id', routineId)
     .maybeSingle();
   if (routineError) {
@@ -126,12 +126,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   if (!routine) return error(404, 'routine_not_found');
 
-  const { count: moveCount, error: movesError } = await admin
+  // One row per move, in play order: the count and each move's reps target.
+  const { data: moves, error: movesError } = await admin
     .from('moves')
-    .select('idx', { count: 'exact', head: true })
-    .eq('routine_id', routineId);
-  if (movesError || moveCount === null) {
-    console.error('submit_session: move count failed', movesError?.code);
+    .select('idx, reps')
+    .eq('routine_id', routineId)
+    .order('idx', { ascending: true });
+  if (movesError || !moves) {
+    console.error('submit_session: moves lookup failed', movesError?.code);
     return error(500, 'internal_error');
   }
 
@@ -139,7 +141,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const result = validateSubmission(payload, {
     id: routine.id,
     durationMs: routine.duration_ms,
-    moveCount,
+    moveCount: moves.length,
+    sets: routine.sets,
+    restMs: routine.rest_ms,
+    repTargets: moves.map((m: { reps: number | null }) => m.reps),
   });
   if (!result.ok) {
     // A routine with no moves is a content problem, not a client error.
@@ -172,6 +177,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     p_score: v.score,
     p_duration_ms: v.duration_ms,
     p_results: v.results,
+    p_sets: v.sets,
   });
   if (rpcError) {
     console.error('submit_session: submit_session_tx failed', rpcError.code);

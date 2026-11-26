@@ -122,7 +122,9 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     _finished = true;
     _timer?.cancel();
     _stopwatch.stop();
-    final summary = _session.summary();
+    final summary = _session.summary(
+      durationMs: _stopwatch.elapsedMilliseconds,
+    );
     final userId = ref.read(authUserProvider)?.id;
     String? nonce;
     if (userId != null) {
@@ -187,7 +189,9 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
                     ),
                   ),
                 if (_running && !_session.isDone)
-                  _MovePanel(session: _session, live: _live),
+                  _session.isResting
+                      ? _RestPanel(session: _session)
+                      : _MovePanel(session: _session, live: _live),
               ],
             ),
     );
@@ -242,7 +246,11 @@ class _MovePanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Move ${session.moveIndex + 1} of $total',
+              [
+                if (session.routine.sets > 1)
+                  'Set ${session.setIndex + 1} of ${session.routine.sets}',
+                'Move ${session.moveIndex + 1} of $total',
+              ].join(' · '),
               style: theme.textTheme.labelLarge?.copyWith(
                 color: Colors.white70,
               ),
@@ -258,6 +266,21 @@ class _MovePanel extends StatelessWidget {
               move.instruction,
               style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white),
             ),
+            if (move.rep case final rep?) ...[
+              const SizedBox(height: 8),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  'Reps ${session.repCount} / ${rep.target}',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    color: session.repCount >= rep.target
+                        ? Colors.green
+                        : Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: live,
@@ -265,6 +288,52 @@ class _MovePanel extends StatelessWidget {
               color: color,
               backgroundColor: Colors.white24,
               borderRadius: BorderRadius.circular(5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Between sets: counts the rest down and names what comes next.
+class _RestPanel extends StatelessWidget {
+  const _RestPanel({required this.session});
+  final WorkoutSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final seconds = (session.restRemainingMs / 1000).ceil();
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Rest · set ${session.setIndex + 2} of ${session.routine.sets} next',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white70,
+              ),
+            ),
+            Text(
+              '$seconds s',
+              style: theme.textTheme.displayMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Next: ${session.currentMove.name}',
+              style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white),
             ),
           ],
         ),

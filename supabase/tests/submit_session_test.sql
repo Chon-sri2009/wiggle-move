@@ -4,7 +4,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(22);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (as the migration owner). Users A and B; routine with 2 moves.
@@ -30,22 +30,22 @@ values
 -- 1-4: privileges and definition.
 select ok(
   not has_function_privilege('anon',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
   'anon has no execute on submit_session_tx'
 );
 select ok(
   not has_function_privilege('authenticated',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
   'authenticated has no execute on submit_session_tx'
 );
 select ok(
   has_function_privilege('service_role',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
   'service_role has execute on submit_session_tx'
 );
 select is(
   (select prosecdef from pg_catalog.pg_proc
-    where oid = 'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb)'::regprocedure),
+    where oid = 'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)'::regprocedure),
   true,
   'submit_session_tx is security definer'
 );
@@ -145,6 +145,52 @@ select is(
     where client_nonce = '00000000-0000-0000-0000-0000000002f2'),
   0::bigint,
   'failed submit left no session row'
+);
+
+-- 18-22: sets and reps (WM-39).
+select is(
+  (select duplicate from public.submit_session_tx(
+    '00000000-0000-0000-0000-0000000002a1', 'st-r1',
+    '00000000-0000-0000-0000-0000000002f5', 60, 24000,
+    '[{"move_idx": 0, "score": 60, "reps": 30, "worst_joint": null, "deviation": null},
+      {"move_idx": 1, "score": 60, "reps": 0, "worst_joint": null, "deviation": null}]',
+    3)),
+  false,
+  'a play with sets and reps is stored'
+);
+select is(
+  (select sets from public.sessions
+    where client_nonce = '00000000-0000-0000-0000-0000000002f5'),
+  3,
+  'sets stored on the session'
+);
+select is(
+  (select mr.reps from public.move_results mr
+    join public.sessions s on s.id = mr.session_id
+    where s.client_nonce = '00000000-0000-0000-0000-0000000002f5'
+      and mr.move_idx = 0),
+  30,
+  'reps stored on the move result'
+);
+select is(
+  (select s.sets * 100 + mr.reps from public.move_results mr
+    join public.sessions s on s.id = mr.session_id
+    where s.client_nonce = '00000000-0000-0000-0000-0000000002f1'
+      and s.user_id = '00000000-0000-0000-0000-0000000002a1'
+      and mr.move_idx = 0),
+  100,
+  'a 6-argument call with no reps key stores 1 set and 0 reps'
+);
+select throws_ok(
+  $$ select * from public.submit_session_tx(
+       '00000000-0000-0000-0000-0000000002a1', 'st-r1',
+       '00000000-0000-0000-0000-0000000002f6', 60, 24000,
+       '[{"move_idx": 0, "score": 60, "reps": -1, "worst_joint": null, "deviation": null},
+         {"move_idx": 1, "score": 60, "reps": 0, "worst_joint": null, "deviation": null}]',
+       3) $$,
+  '23514',
+  null,
+  'negative reps violate the move_results check'
 );
 
 -- 16: authenticated cannot execute.

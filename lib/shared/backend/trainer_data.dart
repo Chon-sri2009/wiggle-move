@@ -17,11 +17,13 @@ Move _move(
   String instruction,
   Map<Joint, double> angles, [
   int ms = 4000,
+  RepSpec? rep,
 ]) => Move(
   name: name,
   instruction: instruction,
   target: MoveTarget(angles),
   durationMs: ms,
+  rep: rep,
 );
 
 final _armsUp = _move('Arms Up', 'Reach both arms straight up', {
@@ -79,6 +81,37 @@ final _halfSquat = _move('Half Squat', 'Bend your knees, sit back', {
   Joint.rightKnee: 125,
 });
 
+// Counted (cardio) moves. A rep is the rep joint reaching `low` and coming
+// back up to `high`; the time is per set. Thresholds are uncalibrated.
+final _squats = _move(
+  'Squats',
+  'Sit back until your knees bend, then stand tall',
+  {Joint.leftKnee: 95, Joint.rightKnee: 95},
+  30000,
+  const RepSpec(target: 12, joint: Joint.leftKnee, low: 110, high: 160),
+);
+
+final _jumpingJacks = _move(
+  'Jumping Jacks',
+  'Jump feet apart with arms overhead, then back',
+  {
+    Joint.leftShoulder: 160,
+    Joint.rightShoulder: 160,
+    Joint.leftElbow: 170,
+    Joint.rightElbow: 170,
+  },
+  20000,
+  const RepSpec(target: 20, joint: Joint.leftShoulder, low: 50, high: 140),
+);
+
+final _highKnees = _move(
+  'High Knees',
+  'Run in place, lifting your left knee to hip height',
+  {Joint.leftHip: 90},
+  20000,
+  const RepSpec(target: 16, joint: Joint.leftHip, low: 110, high: 160),
+);
+
 final builtInTrainers = <Trainer>[
   Trainer(
     id: 'mia',
@@ -126,7 +159,29 @@ final builtInTrainers = <Trainer>[
         id: 'cardio-burn',
         name: 'Cardio Burn',
         level: 'Medium',
+        category: Routine.cardio,
+        met: 6,
         moves: [_halfSquat, _armsUp, _halfSquat, _flex, _halfSquat, _tPose],
+      ),
+      Routine(
+        id: 'squat-sets',
+        name: 'Squat Sets',
+        level: 'Easy',
+        category: Routine.cardio,
+        sets: 3,
+        restMs: 20000,
+        met: 5,
+        moves: [_squats],
+      ),
+      Routine(
+        id: 'cardio-circuit',
+        name: 'Cardio Circuit',
+        level: 'Medium',
+        category: Routine.cardio,
+        sets: 3,
+        restMs: 30000,
+        met: 8,
+        moves: [_jumpingJacks, _squats, _highKnees],
       ),
     ],
   ),

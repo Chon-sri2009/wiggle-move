@@ -8,7 +8,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(18);
+select plan(21);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (as the migration owner, which bypasses RLS).
@@ -73,30 +73,30 @@ values
 
 -- 1: result shape exposes no ids or emails.
 select is(
-  pg_get_function_result('public.leaderboard(text, text, integer)'::regprocedure),
+  pg_get_function_result('public.leaderboard(text, text, integer, text)'::regprocedure),
   'TABLE(rank bigint, display_name text, avatar text, score integer, is_me boolean)',
   'leaderboard returns only rank, display_name, avatar, score, is_me'
 );
 
 -- 2-3: security definer with an empty search_path.
 select is_definer(
-  'public', 'leaderboard', array['text', 'text', 'integer'],
+  'public', 'leaderboard', array['text', 'text', 'integer', 'text'],
   'leaderboard is security definer'
 );
 select is(
   (select proconfig from pg_proc
-    where oid = 'public.leaderboard(text, text, integer)'::regprocedure),
+    where oid = 'public.leaderboard(text, text, integer, text)'::regprocedure),
   array['search_path=""'],
   'leaderboard pins search_path to empty'
 );
 
 -- 4-5: execute privileges.
 select ok(
-  not has_function_privilege('anon', 'public.leaderboard(text, text, integer)', 'execute'),
+  not has_function_privilege('anon', 'public.leaderboard(text, text, integer, text)', 'execute'),
   'anon has no execute on leaderboard'
 );
 select ok(
-  has_function_privilege('authenticated', 'public.leaderboard(text, text, integer)', 'execute'),
+  has_function_privilege('authenticated', 'public.leaderboard(text, text, integer, text)', 'execute'),
   'authenticated has execute on leaderboard'
 );
 
@@ -211,11 +211,52 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- WM-39: category filter. A cardio routine is added now so the expectations
+-- above stay untouched: Bob 70, Alice 50 on it.
+-- ---------------------------------------------------------------------------
+reset role;
+insert into public.routines (id, trainer_id, name, level, duration_ms, sort_order, category)
+values ('lb-r3', 'lb-test-trainer', 'Routine 3', 'Easy', 4000, 2, 'cardio');
+insert into public.sessions (user_id, routine_id, score, duration_ms, played_at, client_nonce)
+values
+  ('00000000-0000-0000-0000-0000000001a1', 'lb-r3', 50, 4000,
+   date_trunc('week', now()) + interval '8 minutes', gen_random_uuid()),
+  ('00000000-0000-0000-0000-0000000001b1', 'lb-r3', 70, 4000,
+   date_trunc('week', now()) + interval '9 minutes', gen_random_uuid());
+set local role authenticated;
+set local request.jwt.claims to '{"sub": "00000000-0000-0000-0000-0000000001a1", "role": "authenticated"}';
+
+-- 17
+select results_eq(
+  $$ select rank, display_name, score, is_me
+     from public.leaderboard(null, 'all', 50, 'cardio') $$,
+  $$ values (1::bigint, 'Bob'::text, 70, false),
+            (2::bigint, 'Alice'::text, 50, true) $$,
+  'cardio category ranks only cardio routines'
+);
+
+-- 18: the dance board does not include the cardio session (Alice 95 + 80).
+select is(
+  (select score from public.leaderboard(null, 'all', 50, 'dance')
+    where display_name = 'Alice'),
+  175,
+  'dance category excludes cardio routines'
+);
+
+-- 19
+select throws_ok(
+  $$ select * from public.leaderboard(null, 'all', 50, 'yoga') $$,
+  '22023',
+  null,
+  'an unknown category raises'
+);
+
+-- ---------------------------------------------------------------------------
 -- As Finn (no sessions): nothing to append.
 -- ---------------------------------------------------------------------------
 set local request.jwt.claims to '{"sub": "00000000-0000-0000-0000-0000000001f1", "role": "authenticated"}';
 
--- 17
+-- 20
 select is(
   (select count(*) from public.leaderboard('lb-r1', 'all', 2)),
   2::bigint,
@@ -228,7 +269,7 @@ select is(
 set local role anon;
 set local request.jwt.claims to '{"role": "anon"}';
 
--- 18
+-- 21
 select throws_ok(
   $$ select * from public.leaderboard() $$,
   '42501',

@@ -140,6 +140,7 @@ void main() {
         'client_nonce',
         'duration_ms',
         'score',
+        'sets',
         'results',
       });
       expect(p['routine_id'], 'mia-pop');
@@ -151,6 +152,7 @@ void main() {
         expect((r as Map).keys.toSet(), {
           'move_idx',
           'score',
+          'reps',
           'worst_joint',
           'deviation',
         });
@@ -158,6 +160,7 @@ void main() {
       expect(results.first, {
         'move_idx': 0,
         'score': 90,
+        'reps': 0,
         'worst_joint': 'leftElbow',
         'deviation': -12.5,
       });

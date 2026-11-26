@@ -9,17 +9,37 @@ import '../pose/pose_math.dart';
 // `sort_order` / `idx`. `toJson` / `fromJson` are the on-device cache format
 // (children already in order). Any malformed input throws [FormatException].
 
+/// How reps of a move are counted: [joint]'s angle must reach [low] and come
+/// back up to [high] ([RepCounter]); [target] reps make a full set of it.
+class RepSpec {
+  const RepSpec({
+    required this.target,
+    required this.joint,
+    required this.low,
+    required this.high,
+  });
+  final int target;
+  final Joint joint;
+  final double low;
+  final double high;
+}
+
 class Move {
   const Move({
     required this.name,
     required this.instruction,
     required this.target,
     this.durationMs = 4000,
+    this.rep,
   });
   final String name;
   final String instruction;
   final MoveTarget target;
   final int durationMs;
+
+  /// Null for a timed pose; set for a counted (cardio) move, where
+  /// [durationMs] is the time allowed per set.
+  final RepSpec? rep;
 
   factory Move.fromJson(Object? json) => _parse('move', () {
     final m = _map(json);
@@ -28,6 +48,7 @@ class Move {
       instruction: m['instruction'] as String,
       durationMs: _positiveInt(m['duration_ms']),
       target: targetFromJson(m['target_angles']),
+      rep: _repFrom(m),
     );
   });
 
@@ -36,6 +57,12 @@ class Move {
     'instruction': instruction,
     'duration_ms': durationMs,
     'target_angles': targetToJson(target),
+    if (rep case final r?) ...{
+      'reps': r.target,
+      'rep_joint': r.joint.name,
+      'rep_low': r.low,
+      'rep_high': r.high,
+    },
   };
 }
 
@@ -45,13 +72,37 @@ class Routine {
     required this.name,
     required this.level,
     required this.moves,
+    this.category = dance,
+    this.sets = 1,
+    this.restMs = 0,
+    this.met = 3.5,
   });
+  static const dance = 'dance';
+  static const cardio = 'cardio';
+  static const categories = [dance, cardio];
+
   final String id;
   final String name;
   final String level;
   final List<Move> moves;
 
+  /// [dance] or [cardio] (matches `routines.category`).
+  final String category;
+
+  /// How many times the move list is played, with [restMs] between sets.
+  final int sets;
+  final int restMs;
+
+  /// Intensity for the calorie estimate (see `estimateCalories`).
+  final double met;
+
+  bool get isCardio => category == cardio;
+
+  /// One set: the sum of the moves (equals `routines.duration_ms`).
   int get durationMs => moves.fold(0, (sum, m) => sum + m.durationMs);
+
+  /// The whole play: every set plus the rests between them.
+  int get totalDurationMs => durationMs * sets + restMs * (sets - 1);
 
   factory Routine.fromRow(Object? row) => _routine(row, sorted: true);
 
@@ -61,6 +112,10 @@ class Routine {
     'id': id,
     'name': name,
     'level': level,
+    'category': category,
+    'sets': sets,
+    'rest_ms': restMs,
+    'met': met,
     'moves': [for (final m in moves) m.toJson()],
   };
 }
@@ -153,12 +208,61 @@ Routine _routine(Object? json, {required bool sorted}) => _parse('routine', () {
     id: m['id'] as String,
     name: m['name'] as String,
     level: m['level'] as String,
+    // Missing keys (old cache, or a DB without the cardio migration) mean a
+    // plain single-set dance routine; a wrong type or value still throws.
+    category: _category(m['category']),
+    sets: _intOr(m['sets'], 1, min: 1),
+    restMs: _intOr(m['rest_ms'], 0, min: 0),
+    met: _metOr(m['met']),
     moves: [
       for (final mv in sorted ? _sortedBy(moves, 'idx') : moves)
         Move.fromJson(mv),
     ],
   );
 });
+
+RepSpec? _repFrom(Map<String, Object?> m) {
+  final reps = m['reps'];
+  if (reps == null) {
+    if (m['rep_joint'] != null ||
+        m['rep_low'] != null ||
+        m['rep_high'] != null) {
+      throw const FormatException('rep fields without reps');
+    }
+    return null;
+  }
+  final low = (m['rep_low'] as num).toDouble();
+  final high = (m['rep_high'] as num).toDouble();
+  if (low >= high) {
+    throw const FormatException('rep_low must be below rep_high');
+  }
+  return RepSpec(
+    target: _positiveInt(reps),
+    joint: Joint.values.byName(m['rep_joint'] as String),
+    low: low,
+    high: high,
+  );
+}
+
+String _category(Object? v) {
+  if (v == null) return Routine.dance;
+  if (v is String && Routine.categories.contains(v)) return v;
+  throw const FormatException('unknown category');
+}
+
+int _intOr(Object? v, int fallback, {required int min}) {
+  if (v == null) return fallback;
+  final i = v as int;
+  if (i < min) throw const FormatException('out of range');
+  return i;
+}
+
+double _metOr(Object? v) {
+  if (v == null) return 3.5;
+  final d = (v as num).toDouble();
+  if (d <= 0 || d > 20) throw const FormatException('met out of range');
+  return d;
+}
 
 /// Runs [body], turning cast/lookup errors into [FormatException].
 T _parse<T>(String what, T Function() body) {
