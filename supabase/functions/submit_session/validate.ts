@@ -30,6 +30,9 @@ export const MAX_ROUTINE_ID_LENGTH = 64;
 /**
  * Reps counted for a move may exceed its target (the counter keeps counting
  * until the set's time is up), but not by more than this factor over all sets.
+ * The app caps each set's reps at the same factor (`maxRepsOvershoot` in
+ * lib/features/workout/workout_session.dart): keep the two equal, or an
+ * honest play is rejected permanently.
  */
 export const REPS_OVERSHOOT = 3;
 

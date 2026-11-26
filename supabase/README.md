@@ -11,6 +11,7 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 | `migrations/20260101000300_storage.sql` | WM-11 `routine-videos` Storage bucket (public read, service-role-only writes). |
 | `migrations/20260101000400_submit_session.sql` | WM-10 `public.submit_session_tx(...)`: atomic, idempotent session + move_results insert (service_role only). |
 | `migrations/20260101000500_cardio.sql` | WM-39 sets/reps/cardio: `routines.category/sets/rest_ms/met`, `moves.reps/rep_*`, `sessions.sets`, `move_results.reps`; `leaderboard(..., p_category)` and `submit_session_tx(..., p_sets)` recreated (grants repeated). |
+| _deploy order_ | Apply `20260101000500_cardio.sql` and deploy the new `submit_session` **before or with** the app that sends `sets`/`reps`/`p_category`: the old validator answers `unknown_key` (a permanent 400, the play is dropped) and an unmigrated database has no `p_category`. |
 | `functions/delete_account/` | WM-16 Edge Function: deletes the calling user from Auth (profile, sessions and results cascade). Not run. |
 | `functions/submit_session/` | WM-10 Edge Function: `index.ts` (Deno handler), `validate.ts` (pure validation), `validate.test.ts` (node tests). |
 | `seed.sql` | WM-11 content seed: trainers, routines, moves mirroring `lib/features/trainers/trainer_data.dart`. |

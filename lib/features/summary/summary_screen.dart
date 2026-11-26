@@ -106,10 +106,12 @@ class _Stats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kcal = summary.calories;
+    final ms = summary.durationMs;
     final parts = [
       if (summary.routine.sets > 1) '${summary.routine.sets} sets',
       if (summary.targetReps > 0)
         '${summary.totalReps} / ${summary.targetReps} reps',
+      if (ms != null && ms > 0) '${_minutesSeconds(ms)} active',
       if (kcal != null && kcal > 0) '≈ $kcal kcal (estimate)',
     ];
     if (parts.isEmpty) return const SizedBox.shrink();
@@ -122,6 +124,11 @@ class _Stats extends StatelessWidget {
       ),
     );
   }
+}
+
+String _minutesSeconds(int ms) {
+  final s = (ms / 1000).round();
+  return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
 }
 
 /// One line under the score; never blocks the summary.

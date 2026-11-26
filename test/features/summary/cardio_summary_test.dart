@@ -51,7 +51,7 @@ void main() {
     await tester.pumpWidget(_app(SummaryScreen(summary: _played(reps: 12))));
     // 3 sets x 12 reps asked, 36 done; 130 s at 5 MET is about 13 kcal.
     expect(
-      find.text('3 sets · 36 / 36 reps · ≈ 13 kcal (estimate)'),
+      find.text('3 sets · 36 / 36 reps · 2:10 active · ≈ 13 kcal (estimate)'),
       findsOneWidget,
     );
     expect(find.text('Reps 36 / 36'), findsOneWidget);

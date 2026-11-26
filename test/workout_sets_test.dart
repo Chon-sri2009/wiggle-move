@@ -118,6 +118,18 @@ void main() {
     expect(r.score, 100);
   });
 
+  test('reps are capped at the overshoot bound the server accepts', () {
+    final s = WorkoutSession(_routine(sets: 1));
+    for (var i = 0; i < 50; i++) {
+      _rep(s); // a detection glitch: far more cycles than possible
+    }
+    expect(s.repCount, 50); // the live counter shows what was seen
+    s.advance(10000);
+    final r = s.summary().outcomes.single.result;
+    expect(r.reps, 3 * maxRepsOvershoot); // target 3
+    expect(r.score, 100); // the cap costs no score
+  });
+
   test('frames during a rest are ignored', () {
     final s = WorkoutSession(_routine());
     s.advance(10000);

@@ -1,9 +1,17 @@
+import 'dart:math' show min;
+
 import '../scoring/move_scorer.dart';
 import '../../shared/pose/pose_math.dart';
 import '../../shared/pose/rep_counter.dart';
 import '../../shared/backend/content_models.dart';
 import '../../shared/backend/sessions_repository.dart';
 import '../../shared/calories.dart';
+
+/// A set's counted reps are capped at this multiple of the move's reps
+/// target. Reps over the target add no score, and the server rejects a play
+/// (permanently) whose reps exceed target x sets x its REPS_OVERSHOOT
+/// (supabase/functions/submit_session/validate.ts): keep the two equal.
+const maxRepsOvershoot = 3;
 
 /// One move across all its sets: [result] is the aggregate (mean score,
 /// summed reps and frames, the worst joint of the worst set).
@@ -154,7 +162,7 @@ class WorkoutSession {
       var result = _scorer!.finish();
       final rep = routine.moves[m].rep;
       if (rep != null) {
-        final reps = _counter!.count;
+        final reps = min(_counter!.count, rep.target * maxRepsOvershoot);
         final factor = reps >= rep.target ? 1.0 : reps / rep.target;
         result = MoveResult(
           score: (result.score * factor).round(),
