@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
+import 'package:camera/camera.dart' show CameraException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,10 +12,12 @@ import '../../shared/uuid.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/backend/content_models.dart';
 import '../../shared/backend/routine_video.dart';
+import '../../shared/pose/pose_math.dart';
 import '../summary/summary_screen.dart';
 import 'camera_failure.dart';
 import 'play_clock.dart';
-import 'pose_service.dart';
+import 'pose_service.dart' show poseDetectionSupported;
+import 'workout_camera.dart';
 import 'workout_cues.dart';
 import 'workout_session.dart';
 
@@ -30,17 +32,14 @@ class WorkoutScreen extends ConsumerStatefulWidget {
 class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     with WidgetsBindingObserver {
   late final WorkoutSession _session = WorkoutSession(widget.routine);
-  final _wall = Stopwatch()..start();
-  late final _clock = PlayClock(() => _wall.elapsedMilliseconds);
-  CameraController? _camera;
-  PoseService? _pose;
+  late final _clock = PlayClock(ref.read(playNowMsProvider));
+  WorkoutCamera? _camera;
   Timer? _timer;
   CameraFailure? _failure;
   int _countdown = 3;
   bool _running = false;
   bool _paused = false;
   bool _finished = false;
-  bool _detecting = false;
   double _live = 0;
   String _segment = '';
 
@@ -59,29 +58,15 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
       return;
     }
     try {
-      final cameras = await availableCameras();
-      if (!mounted) return;
-      if (cameras.isEmpty) {
-        _fail(noCameraFailure);
-        return;
-      }
-      final description = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
-      final camera = CameraController(
-        description,
-        ResolutionPreset.medium,
-        enableAudio: false,
-        imageFormatGroup: poseImageFormat,
-      );
+      final camera = ref.read(workoutCameraFactoryProvider)();
       _camera = camera;
-      await camera.initialize();
+      await camera.open();
       if (!mounted) return;
-      _pose = PoseService();
       setState(() {});
       _cues.countdownTick();
       _timer = Timer.periodic(const Duration(seconds: 1), _onCountdown);
+    } on NoCameraException {
+      _fail(noCameraFailure);
     } on CameraException catch (e) {
       _fail(cameraFailureFor(e.code, e.description));
     } catch (_) {
@@ -103,15 +88,12 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   /// Starts over after a failed camera start (e.g. permission now allowed).
   Future<void> _retry() async {
     final camera = _camera;
-    final pose = _pose;
     _camera = null;
-    _pose = null;
     setState(() {
       _failure = null;
       _countdown = 3;
     });
-    await camera?.dispose();
-    await pose?.close();
+    await camera?.close();
     if (mounted) await _init();
   }
 
@@ -128,7 +110,9 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     });
     _cues.go();
     _clock.start();
-    _camera!.startImageStream(_onFrame);
+    unawaited(
+      _camera!.startFrames(_onAngles).catchError((_) => _cameraStopped()),
+    );
     _timer = Timer.periodic(const Duration(milliseconds: 100), _onTick);
   }
 
@@ -148,20 +132,21 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     setState(() {});
   }
 
-  Future<void> _onFrame(CameraImage image) async {
-    if (_detecting || !_running || _paused || _finished) return;
-    _detecting = true;
-    try {
-      final angles = await _pose!.detect(image, _camera!.description);
-      if (angles == null || _paused || _finished) return;
-      final reps = _session.repCount;
-      final score = _session.addFrame(angles);
-      if (_session.repCount > reps) _cues.repCounted();
-      if (score != null && mounted) setState(() => _live = score);
-    } finally {
-      _detecting = false;
-    }
+  void _onAngles(Map<Joint, double> angles) {
+    if (!_running || _paused || _finished) return;
+    final reps = _session.repCount;
+    final score = _session.addFrame(angles);
+    if (_session.repCount > reps) _cues.repCounted();
+    if (score != null && mounted) setState(() => _live = score);
   }
+
+  void _cameraStopped() => _fail(
+    const CameraFailure(
+      CameraProblem.other,
+      'The camera stopped during your workout. Go back and start again.',
+      canRetry: false,
+    ),
+  );
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -174,24 +159,16 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     if (!_running || _paused || _finished) return;
     _clock.pause();
     final camera = _camera;
-    if (camera != null && camera.value.isStreamingImages) {
-      unawaited(camera.stopImageStream().catchError((_) {}));
-    }
+    if (camera != null) unawaited(camera.stopFrames().catchError((_) {}));
     if (mounted) setState(() => _paused = true);
   }
 
   Future<void> _resume() async {
     if (!_paused || _finished) return;
     try {
-      await _camera!.startImageStream(_onFrame);
+      await _camera!.startFrames(_onAngles);
     } catch (_) {
-      _fail(
-        const CameraFailure(
-          CameraProblem.other,
-          'The camera stopped during your workout. Go back and start again.',
-          canRetry: false,
-        ),
-      );
+      _cameraStopped();
       return;
     }
     _clock.start();
@@ -265,8 +242,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
-    _camera?.dispose();
-    _pose?.close();
+    _camera?.close();
     super.dispose();
   }
 
@@ -301,12 +277,12 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                 failure: failure,
                 onRetry: failure.canRetry ? _retry : null,
               )
-            : camera == null || !camera.value.isInitialized
+            : camera == null || !camera.isOpen
             ? const LoadingView()
             : Stack(
                 fit: StackFit.expand,
                 children: [
-                  _Preview(camera),
+                  camera.buildPreview(),
                   if (!_running)
                     Center(
                       child: Semantics(
@@ -345,29 +321,6 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                     _PausedPanel(onResume: _resume, onQuit: _askQuit),
                 ],
               ),
-      ),
-    );
-  }
-}
-
-class _Preview extends StatelessWidget {
-  const _Preview(this.camera);
-  final CameraController camera;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = camera.value.previewSize!;
-    // Preview size is reported in landscape; the app is portrait-locked.
-    return ExcludeSemantics(
-      child: SizedBox.expand(
-        child: FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: size.height,
-            height: size.width,
-            child: CameraPreview(camera),
-          ),
-        ),
       ),
     );
   }

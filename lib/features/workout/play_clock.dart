@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 /// Play time that excludes pauses. The workout timeline and the submitted
 /// `duration_ms` both come from here, so a play that was backgrounded or
 /// paused is not stretched (the server rejects durations over 3x the routine).
@@ -26,3 +28,10 @@ class PlayClock {
     _startedAt = null;
   }
 }
+
+/// Monotonic milliseconds for [PlayClock]; replaced in tests so a workout can
+/// be played in fake time.
+final playNowMsProvider = Provider<int Function()>((_) {
+  final wall = Stopwatch()..start();
+  return () => wall.elapsedMilliseconds;
+});
