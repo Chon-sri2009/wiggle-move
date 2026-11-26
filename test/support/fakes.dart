@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:wiggle_move/shared/backend/auth_repository.dart';
 import 'package:wiggle_move/shared/backend/content_models.dart';
 import 'package:wiggle_move/shared/backend/content_repository.dart';
+import 'package:wiggle_move/shared/backend/leaderboard_repository.dart';
 import 'package:wiggle_move/shared/backend/profile.dart';
 import 'package:wiggle_move/shared/backend/profile_repository.dart';
 import 'package:wiggle_move/shared/backend/sessions_repository.dart';
@@ -152,5 +153,33 @@ class FakeContentRepository implements ContentRepository {
     final f = failWith;
     if (f != null) throw f;
     return trainers;
+  }
+}
+
+/// [LeaderboardRepository] returning [rows] (or the per-query [byQuery]
+/// rows). Records every [calls] query; set [failWith] to make fetches throw,
+/// or [gate] to hold them until completed.
+class FakeLeaderboardRepository implements LeaderboardRepository {
+  FakeLeaderboardRepository([this.rows = const []]);
+
+  List<LeaderboardRow> rows;
+  final calls = <({String? routineId, LeaderboardPeriod period})>[];
+  RepositoryFailure? failWith;
+  Completer<void>? gate;
+  Map<({String? routineId, LeaderboardPeriod period}), List<LeaderboardRow>>
+  byQuery = {};
+
+  @override
+  Future<List<LeaderboardRow>> fetch({
+    String? routineId,
+    required LeaderboardPeriod period,
+    int limit = 50,
+  }) async {
+    final q = (routineId: routineId, period: period);
+    calls.add(q);
+    await gate?.future;
+    final f = failWith;
+    if (f != null) throw f;
+    return byQuery[q] ?? rows;
   }
 }

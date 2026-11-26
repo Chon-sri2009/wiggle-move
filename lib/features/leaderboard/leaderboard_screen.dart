@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/backend/auth_providers.dart';
+import '../../shared/backend/leaderboard_repository.dart';
+import '../../shared/backend/profile_repository.dart';
 import '../../shared/widgets/async_states.dart';
 import '../trainers/trainers_provider.dart';
-import 'leaderboard_store.dart';
+import 'leaderboard_provider.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -15,13 +16,24 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   String? _routineId;
+  LeaderboardPeriod _period = LeaderboardPeriod.all;
+
+  LeaderboardQuery get _query => (routineId: _routineId, period: _period);
+
+  Future<void> _refresh() async {
+    final provider = leaderboardProvider(_query);
+    ref.invalidate(provider);
+    try {
+      await ref.read(provider.future);
+    } catch (_) {
+      // Shown as the error state.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(leaderboardProvider);
-    final me = ref.watch(authUserProvider)?.displayName;
-    final ranked = rankEntries(entries, routineId: _routineId);
-    // Content may still be loading: filter chips appear once it is there.
+    final board = ref.watch(leaderboardProvider(_query));
+    // Content may still be loading: routine chips appear once it is there.
     final routines = [
       for (final t in ref.watch(trainersProvider).value?.trainers ?? const [])
         ...t.routines,
@@ -31,6 +43,23 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       appBar: AppBar(title: const Text('Leaderboard')),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: SegmentedButton<LeaderboardPeriod>(
+              segments: const [
+                ButtonSegment(
+                  value: LeaderboardPeriod.week,
+                  label: Text('Weekly'),
+                ),
+                ButtonSegment(
+                  value: LeaderboardPeriod.all,
+                  label: Text('All-time'),
+                ),
+              ],
+              selected: {_period},
+              onSelectionChanged: (s) => setState(() => _period = s.first),
+            ),
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.all(12),
@@ -52,35 +81,73 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ),
           ),
           Expanded(
-            child: ranked.isEmpty
-                ? const EmptyView(
-                    message:
-                        'No scores yet. Finish a routine to get on the board!',
-                  )
-                : ListView.builder(
-                    itemCount: ranked.length,
-                    itemBuilder: (context, i) {
-                      final e = ranked[i];
-                      return ListTile(
-                        selected: e.playerName == me,
-                        leading: CircleAvatar(child: Text('${i + 1}')),
-                        title: Text(e.playerName),
-                        subtitle: Text(
-                          routines
-                                  .where((r) => r.id == e.routineId)
-                                  .firstOrNull
-                                  ?.name ??
-                              e.routineId,
-                        ),
-                        trailing: Text(
-                          '${e.score}',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      );
-                    },
-                  ),
+            child: board.when(
+              skipLoadingOnReload: true,
+              loading: () => const LoadingView(),
+              error: (e, _) => ErrorView(
+                message: e is RepositoryFailure
+                    ? e.message
+                    : 'Could not load the leaderboard.',
+                onRetry: _refresh,
+              ),
+              data: (rows) => RefreshIndicator(
+                onRefresh: _refresh,
+                child: rows.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(height: 120),
+                          EmptyView(
+                            message: 'No scores yet — play a routine',
+                            icon: Icons.emoji_events_outlined,
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: rows.length,
+                        itemBuilder: (context, i) => _RowTile(rows[i]),
+                      ),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RowTile extends StatelessWidget {
+  const _RowTile(this.row);
+  final LeaderboardRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final initial = row.displayName.isEmpty
+        ? '?'
+        : row.displayName.characters.first.toUpperCase();
+    return ListTile(
+      selected: row.isMe,
+      selectedTileColor: scheme.primaryContainer.withValues(alpha: 0.5),
+      leading: SizedBox(
+        width: 72,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              child: Text(
+                '${row.rank}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            CircleAvatar(child: Text(initial)),
+          ],
+        ),
+      ),
+      title: Text(row.isMe ? '${row.displayName} (you)' : row.displayName),
+      trailing: Text(
+        '${row.score}',
+        style: Theme.of(context).textTheme.titleLarge,
       ),
     );
   }

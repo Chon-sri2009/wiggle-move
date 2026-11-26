@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiggle_move/app/app.dart';
-import 'package:wiggle_move/features/leaderboard/leaderboard_store.dart';
 import 'package:wiggle_move/shared/prefs.dart';
 import 'package:wiggle_move/shared/backend/auth_providers.dart';
 import 'package:wiggle_move/shared/backend/content_providers.dart';
+import 'package:wiggle_move/shared/backend/leaderboard_providers.dart';
 import 'package:wiggle_move/shared/backend/offline_content_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_leaderboard_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
 import 'package:wiggle_move/shared/backend/offline_profile_repository.dart';
 import 'package:wiggle_move/shared/backend/profile_providers.dart';
@@ -25,6 +26,9 @@ Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
       ),
       contentRepositoryProvider.overrideWithValue(
         const OfflineContentRepository(),
+      ),
+      leaderboardRepositoryProvider.overrideWithValue(
+        OfflineLeaderboardRepository(instance, playerName: () => 'Ann'),
       ),
     ],
     child: const WiggleMoveApp(),
@@ -158,7 +162,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Leaderboard'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('No scores yet'), findsOneWidget);
+    expect(find.text('No scores yet — play a routine'), findsOneWidget);
   });
 
   testWidgets('sign out returns to login', (tester) async {
@@ -169,24 +173,5 @@ void main() {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);
-  });
-
-  test('rankEntries keeps best score per player and sorts descending', () {
-    LeaderboardEntry e(String n, int s, [String r = 'a']) => LeaderboardEntry(
-      playerName: n,
-      routineId: r,
-      score: s,
-      playedAt: DateTime(2026),
-    );
-    final ranked = rankEntries([
-      e('Ann', 60),
-      e('Ann', 80),
-      e('Bo', 70),
-      e('Bo', 90, 'b'),
-    ], routineId: 'a');
-    expect(ranked.map((x) => '${x.playerName}:${x.score}'), [
-      'Ann:80',
-      'Bo:70',
-    ]);
   });
 }
