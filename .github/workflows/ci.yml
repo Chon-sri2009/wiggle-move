@@ -46,7 +46,8 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" asks the GitHub API and fails when rate limited.
+          version: 3.4.0
 
       - name: Start local Supabase
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,inbucket
