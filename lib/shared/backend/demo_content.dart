@@ -4,14 +4,14 @@ import '../pose/pose_math.dart';
 import 'content_models.dart';
 
 /// Offline-only demo of "follow the trainer video": the workout plays
-/// `assets/videos/squat_reference.webm` and judges the user against the
+/// `assets/videos/squat_reference.mp4` and judges the user against the
 /// trainer's moves in it (`referenceAssets` in features/workout/reference).
 /// Not part of `builtInTrainers`, so it is not in `supabase/seed.sql`.
 ///
 /// The target below is only the fallback for frames the video timeline cannot
-/// judge. The move lasts as long as the clip (7.1 s); the clip restarts with
-/// each set.
+/// judge. The move lasts as long as the clip (3 min 10 s).
 const demoRoutineId = 'video-squat-demo';
+const squatVideoDurationMs = 189720;
 
 /// The 33-minute full-body cardio workout (the team's own video). The move
 /// lasts as long as the clip; the trainer's pose at each moment comes from
@@ -30,14 +30,14 @@ final demoTrainer = Trainer(
       name: 'Follow the video: Squat',
       level: 'Medium',
       category: Routine.cardio,
-      sets: 2,
+      sets: 1,
       restMs: 8000,
       met: 5,
       moves: [
         Move(
           name: 'Squat with the video',
           instruction: 'Copy the trainer on screen',
-          durationMs: 7100,
+          durationMs: squatVideoDurationMs,
           target: MoveTarget({Joint.leftKnee: 100, Joint.rightKnee: 100}),
         ),
       ],

@@ -1,4 +1,4 @@
-name: Build Windows App
+name: Build Windows & Android Apps
 
 on:
   workflow_dispatch:
@@ -58,6 +58,55 @@ jobs:
             gh release create "$TAG" wiggle-move-windows.zip \
               --prerelease \
               --target "${{ github.sha }}" \
-              --title "Windows Dev Build (Offline Mode)" \
-              --notes "Auto-built Windows profile bundle with WM_OFFLINE=true from commit ${{ github.sha }}."
+              --title "Dev Builds (Windows + Android Offline Mode)" \
+              --notes "Auto-built Windows profile bundle and Android APK with WM_OFFLINE=true from commit ${{ github.sha }}."
+          fi
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (profile, offline dev mode)
+        run: flutter build apk --profile --dart-define=WM_OFFLINE=true --android-skip-build-dependency-validation
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-profile.apk wiggle-move-android.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiggle-move-android
+          path: wiggle-move-android.apk
+          retention-days: 14
+
+      - name: Publish Android APK to dev pre-release
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="windows-dev"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" wiggle-move-android.apk --clobber
+          else
+            gh release create "$TAG" wiggle-move-android.apk \
+              --prerelease \
+              --target "${{ github.sha }}" \
+              --title "Dev Builds (Windows + Android Offline Mode)" \
+              --notes "Auto-built Windows profile bundle and Android APK with WM_OFFLINE=true from commit ${{ github.sha }}."
           fi

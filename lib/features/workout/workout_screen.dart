@@ -405,29 +405,62 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   }
 }
 
-/// The trainer video as the main picture: its own shape (letterboxed, never
-/// stretched or cropped), dimmed to 55% so it reads as background.
+/// The trainer video as the main picture. On portrait screens (phones) the
+/// video is scaled up with [BoxFit.cover] across the main stage so a centered
+/// trainer fills the screen cleanly instead of shrinking into a thin strip.
 class _VideoStage extends StatelessWidget {
   const _VideoStage({required this.video});
   final ReferenceVideo video;
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.paddingOf(context).top;
+    final bottomPad = MediaQuery.paddingOf(context).bottom;
     return ColoredBox(
       color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: video.aspect,
-              child: video.view(radius: 0),
-            ),
-          ),
-          // A dark veil, not Opacity: a video texture can render blank
-          // inside an opacity layer.
-          const IgnorePointer(child: ColoredBox(color: Color(0x73000000))),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isPortrait = constraints.maxHeight > constraints.maxWidth;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              if (isPortrait)
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: topPad + kToolbarHeight * 0.6,
+                    bottom: bottomPad + 108,
+                  ),
+                  child: video.view(radius: 0, fit: BoxFit.cover),
+                )
+              else
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: video.aspect,
+                    child: video.view(radius: 0),
+                  ),
+                ),
+              // A light veil + edge scrims keep HUD text readable without
+              // hiding the trainer (never Opacity, which can blank video).
+              const IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x88000000),
+                        Color(0x1F000000),
+                        Color(0x1F000000),
+                        Color(0xB3000000),
+                      ],
+                      stops: [0.0, 0.16, 0.76, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

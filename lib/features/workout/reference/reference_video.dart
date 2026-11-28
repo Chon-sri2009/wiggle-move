@@ -101,21 +101,30 @@ class ReferenceVideo {
     }
   }
 
-  Widget view({double radius = 12}) => ExcludeSemantics(
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: ColoredBox(
-        color: Colors.black,
-        child: _useMediaKit
-            ? Video(
-                controller: _controller!,
-                controls: NoVideoControls,
-                fit: BoxFit.contain,
-              )
-            : VideoPlayer(_vpController!),
-      ),
-    ),
-  );
+  Widget view({double radius = 12, BoxFit fit = BoxFit.contain}) =>
+      ExcludeSemantics(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: ColoredBox(
+            color: Colors.black,
+            child: _useMediaKit
+                ? Video(
+                    controller: _controller!,
+                    controls: NoVideoControls,
+                    fit: fit,
+                  )
+                : FittedBox(
+                    fit: fit,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: aspect * 1000,
+                      height: 1000,
+                      child: VideoPlayer(_vpController!),
+                    ),
+                  ),
+          ),
+        ),
+      );
 
   Future<void> dispose() async {
     _disposed = true;

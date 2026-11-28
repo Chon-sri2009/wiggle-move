@@ -17,7 +17,7 @@ class ReferenceAsset {
 /// declare both files under `flutter: assets:`).
 const referenceAssets = <String, ReferenceAsset>{
   'video-squat-demo': ReferenceAsset(
-    video: 'assets/videos/squat_reference.webm',
+    video: 'assets/videos/squat_reference.mp4',
     timeline: 'assets/reference/squat.timeline.json',
   ),
   'video-workout-30': ReferenceAsset(

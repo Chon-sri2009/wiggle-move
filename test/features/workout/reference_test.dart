@@ -19,8 +19,8 @@ void main() {
   group('ReferenceClip', () {
     test('loads the squat timeline', () {
       final clip = _clip();
-      expect(clip.sampleCount, 71);
-      expect(clip.seconds, closeTo(7.1, 0.01));
+      expect(clip.sampleCount, 949);
+      expect(clip.seconds, closeTo(189.72, 0.05));
     });
 
     test('a user matching the trainer is judged against the same pose', () {
@@ -90,8 +90,6 @@ void main() {
       (r) => r.id == demoRoutineId,
     );
 
-    WorkoutSession session() => WorkoutSession(routine)..reference = _clip();
-
     // One set, so the score is not averaged with a set nobody played.
     final oneSet = Routine(
       id: routine.id,
@@ -128,9 +126,17 @@ void main() {
     });
 
     test('the trainer clip restarts with the second set', () {
-      final s = session();
-      // 100 ms into set 2 the offset is 100, not 8.2 s: frames still score.
-      final setTwoStart = routine.durationMs + routine.restMs;
+      final twoSets = Routine(
+        id: routine.id,
+        name: routine.name,
+        level: routine.level,
+        sets: 2,
+        restMs: routine.restMs,
+        moves: routine.moves,
+      );
+      final s = WorkoutSession(twoSets)..reference = _clip();
+      // 100 ms into set 2 the offset is 100, not past the clip end: frames still score.
+      final setTwoStart = twoSets.durationMs + twoSets.restMs;
       s.advance(setTwoStart + 100);
       expect(s.isResting, isFalse);
       expect(s.setIndex, 1);

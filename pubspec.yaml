@@ -76,7 +76,7 @@ flutter:
     - assets/models/pose_labels.json
     - assets/models/posenet_075_stride16.bin
     - assets/models/form_head.bin
-    - assets/videos/squat_reference.webm
+    - assets/videos/squat_reference.mp4
     - assets/reference/squat.timeline.json
     - assets/videos/workout30.mp4
     - assets/reference/workout30.timeline.json
