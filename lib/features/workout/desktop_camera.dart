@@ -12,6 +12,7 @@ import '../../shared/pose/angle_smoother.dart';
 import '../../shared/pose/pose_math.dart';
 import 'form/form_coach.dart';
 import 'form/form_feedback.dart';
+import 'form/frame_preprocess.dart' show modelInputSize;
 import 'form/keypoint_landmarks.dart';
 import 'form/posenet_engine.dart' show PoseNetOutput;
 import 'form/posenet_worker.dart';
@@ -44,13 +45,34 @@ class DesktopCamera implements WorkoutCamera {
   Future<void> open() async {
     final cameras = await availableCameras();
     if (cameras.isEmpty) throw const NoCameraException();
-    final controller = CameraController(
-      cameras.first,
-      ResolutionPreset.low,
-      enableAudio: false,
-    );
+    // Many Windows webcams (e.g. 480p/720p-only HD cameras) fail preview init
+    // when asked for ResolutionPreset.low (<=240p). Try medium first and fall
+    // back across presets and cameras so any working webcam opens cleanly.
+    CameraController? controller;
+    Object? lastError;
+    for (final camera in cameras) {
+      for (final preset in const [
+        ResolutionPreset.medium,
+        ResolutionPreset.high,
+        ResolutionPreset.max,
+        ResolutionPreset.low,
+      ]) {
+        final candidate = CameraController(camera, preset, enableAudio: false);
+        try {
+          await candidate.initialize();
+          controller = candidate;
+          break;
+        } catch (e) {
+          lastError = e;
+          await candidate.dispose().catchError((_) {});
+        }
+      }
+      if (controller != null) break;
+    }
+    if (controller == null) {
+      throw lastError ?? StateError('Failed to open camera');
+    }
     _controller = controller;
-    await controller.initialize();
 
     final posenet = await rootBundle.load(
       'assets/models/posenet_075_stride16.bin',
@@ -183,7 +205,14 @@ class DesktopCamera implements WorkoutCamera {
         await File(shot.path).delete();
       } catch (_) {}
     }
-    final codec = await ui.instantiateImageCodec(bytes);
+    final preview = controller.value.previewSize;
+    final portrait = preview != null && preview.height > preview.width;
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: portrait ? null : modelInputSize,
+      targetHeight: portrait ? modelInputSize : null,
+      allowUpscaling: false,
+    );
     final image = (await codec.getNextFrame()).image;
     final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     final width = image.width, height = image.height;
