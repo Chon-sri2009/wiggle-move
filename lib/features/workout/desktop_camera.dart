@@ -8,11 +8,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/widgets.dart';
 
+import '../../shared/pose/angle_smoother.dart';
 import '../../shared/pose/pose_math.dart';
 import 'form/form_coach.dart';
 import 'form/form_feedback.dart';
-import 'form/frame_preprocess.dart';
 import 'form/keypoint_landmarks.dart';
+import 'form/posenet_engine.dart' show PoseNetOutput;
 import 'form/posenet_worker.dart';
 import 'workout_camera.dart';
 
@@ -31,6 +32,7 @@ class DesktopCamera implements WorkoutCamera {
   bool _running = false;
   Future<void>? _loop;
   final _form = ValueNotifier<FormFeedback?>(null);
+  final _smoother = AngleSmoother(alpha: 0.65, maxJumpDeg: 120.0);
 
   @override
   ValueListenable<FormFeedback?> get formFeedback => _form;
@@ -44,7 +46,7 @@ class DesktopCamera implements WorkoutCamera {
     if (cameras.isEmpty) throw const NoCameraException();
     final controller = CameraController(
       cameras.first,
-      ResolutionPreset.medium,
+      ResolutionPreset.low,
       enableAudio: false,
     );
     _controller = controller;
@@ -98,6 +100,7 @@ class DesktopCamera implements WorkoutCamera {
   ) async {
     _onAngles = onAngles;
     if (_running) return;
+    _smoother.reset();
     _running = true;
     // Fail here (not silently later) if the first picture cannot be taken.
     final first = _captureAndAnalyse();
@@ -105,11 +108,13 @@ class DesktopCamera implements WorkoutCamera {
     _loop = _run();
   }
 
+  Future<void>? _inflight;
+
   Future<void> _run() async {
     var failures = 0;
     while (_running) {
       try {
-        await _captureAndAnalyse();
+        await _captureAndPipeline();
         failures = 0;
       } catch (_) {
         if (++failures >= 5) {
@@ -118,6 +123,8 @@ class DesktopCamera implements WorkoutCamera {
         }
       }
     }
+    await _inflight?.catchError((_) {});
+    _inflight = null;
   }
 
   bool _busy = false;
@@ -126,13 +133,46 @@ class DesktopCamera implements WorkoutCamera {
     if (_busy) return;
     _busy = true;
     try {
-      await _captureAndAnalyseOnce();
+      final frame = await _captureRgba();
+      if (frame == null) return;
+      final out = await _worker!.runRgba(
+        frame.bytes,
+        frame.width,
+        frame.height,
+        mirror: true,
+      );
+      _publish(out);
     } finally {
       _busy = false;
     }
   }
 
-  Future<void> _captureAndAnalyseOnce() async {
+  /// Captures the next webcam frame while the previous frame's inference is
+  /// still running on the worker isolate, overlapping I/O with neural net work.
+  Future<void> _captureAndPipeline() async {
+    final frame = await _captureRgba();
+    if (!_running) return;
+    await _inflight?.catchError((_) {});
+    _inflight = null;
+    if (frame == null || !_running) return;
+    _inflight = _worker!
+        .runRgba(frame.bytes, frame.width, frame.height, mirror: true)
+        .then(_publish);
+  }
+
+  void _publish(PoseNetOutput out) {
+    if (_onAngles == null) return;
+    final raw = measureAngles(
+      landmarksFromKeypoints(out.keypoints, mirrored: true),
+    );
+    if (raw.isNotEmpty) {
+      final smoothed = _smoother.add(raw);
+      if (smoothed.isNotEmpty) _onAngles?.call(smoothed);
+    }
+    _form.value = _coach!.update(out.probabilities);
+  }
+
+  Future<({Uint8List bytes, int width, int height})?> _captureRgba() async {
     final controller = _controller!;
     final shot = await controller.takePicture();
     final Uint8List bytes;
@@ -149,29 +189,12 @@ class DesktopCamera implements WorkoutCamera {
     final width = image.width, height = image.height;
     image.dispose();
     codec.dispose();
-    if (rgba == null) return;
-
-    final data = rgba.buffer.asUint8List(
-      rgba.offsetInBytes,
-      rgba.lengthInBytes,
-    );
-    final input = preprocessFrame(
+    if (rgba == null) return null;
+    return (
+      bytes: rgba.buffer.asUint8List(rgba.offsetInBytes, rgba.lengthInBytes),
       width: width,
       height: height,
-      pixelAt: (x, y) {
-        final i = (y * width + x) * 4;
-        return (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-      },
-      mirror: true,
     );
-    final out = await _worker!.run(input);
-    if (_onAngles == null) return;
-
-    final angles = measureAngles(
-      landmarksFromKeypoints(out.keypoints, mirrored: true),
-    );
-    if (angles.isNotEmpty) _onAngles?.call(angles);
-    _form.value = _coach!.update(out.probabilities);
   }
 
   @override

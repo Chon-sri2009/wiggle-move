@@ -117,7 +117,7 @@ void main() {
 
   group('FormSmoother', () {
     test('needs consecutive confident frames to switch', () {
-      final s = FormSmoother();
+      final s = FormSmoother(framesToSwitch: 3);
       expect(s.add('A', 0.9), isNull);
       expect(s.add('A', 0.9), isNull);
       expect(s.add('A', 0.9), 'A');
@@ -126,7 +126,7 @@ void main() {
     test(
       'a noisy frame resets the pending switch but not the stable label',
       () {
-        final s = FormSmoother();
+        final s = FormSmoother(framesToSwitch: 3);
         for (var i = 0; i < 3; i++) {
           s.add('A', 0.9);
         }
@@ -139,14 +139,16 @@ void main() {
       },
     );
 
-    test('low confidence frames are ignored', () {
-      final s = FormSmoother();
-      for (var i = 0; i < 3; i++) {
-        s.add('A', 0.9);
-      }
-      for (var i = 0; i < 5; i++) {
-        expect(s.add('B', 0.3), 'A');
-      }
+    test('low confidence frames are ignored and clear pending candidates', () {
+      final s = FormSmoother(framesToSwitch: 2, minConfidence: 0.7);
+      s.add('A', 0.9);
+      expect(s.add('A', 0.9), 'A');
+
+      // One noisy 'B', then an unsure frame resets the pending switch.
+      expect(s.add('B', 0.9), 'A');
+      expect(s.add('B', 0.4), 'A');
+      expect(s.add('B', 0.9), 'A');
+      expect(s.add('B', 0.9), 'B');
     });
   });
 

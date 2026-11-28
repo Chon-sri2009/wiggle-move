@@ -51,6 +51,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   bool _finished = false;
   double _live = 0;
   String _segment = '';
+  String _videoSet = '';
 
   WorkoutCues get _cues => ref.read(workoutCuesProvider);
 
@@ -142,6 +143,9 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     });
     _cues.go();
     _clock.start();
+    _segment =
+        '${_session.setIndex}/${_session.moveIndex}/${_session.isResting}';
+    _videoSet = '${_session.setIndex}/${_session.isResting}';
     unawaited(_video?.restart());
     unawaited(
       _camera!.startFrames(_onAngles).catchError((_) => _cameraStopped()),
@@ -161,7 +165,11 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     if (segment != _segment) {
       if (_segment.isNotEmpty) _cues.segmentChanged();
       _segment = segment;
-      // The trainer video restarts with each set and waits during rests.
+    }
+    // The trainer video restarts with each set and waits during rests.
+    final videoSet = '${_session.setIndex}/${_session.isResting}';
+    if (videoSet != _videoSet) {
+      _videoSet = videoSet;
       if (_session.isResting) {
         unawaited(_video?.pause());
       } else {

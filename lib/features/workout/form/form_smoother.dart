@@ -2,7 +2,7 @@
 /// after [framesToSwitch] confident frames in a row, so a single noisy frame
 /// never flips the feedback on screen.
 class FormSmoother {
-  FormSmoother({this.minConfidence = 0.6, this.framesToSwitch = 3});
+  FormSmoother({this.minConfidence = 0.7, this.framesToSwitch = 2});
 
   final double minConfidence;
   final int framesToSwitch;
@@ -18,7 +18,10 @@ class FormSmoother {
   /// Feeds one frame's best label and its probability; returns [stable].
   String? add(String label, double confidence) {
     if (confidence < minConfidence) {
-      // An unsure frame neither confirms nor breaks a pending switch.
+      // An unsure frame breaks any pending switch so stale noisy frames cannot
+      // accumulate across uncertain gaps.
+      _candidate = null;
+      _count = 0;
       return _stable;
     }
     if (label == _stable) {

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'frame_preprocess.dart';
 import 'posenet_engine.dart';
 
 /// Runs [PoseNetEngine] on its own isolate so a ~0.3 s inference never
@@ -66,6 +67,27 @@ class PoseNetWorker {
     return pending.future;
   }
 
+  /// Preprocesses raw RGBA8888 [rgba] ([width] x [height]) on the worker
+  /// isolate and runs inference, keeping the UI isolate free of pixel math.
+  Future<PoseNetOutput> runRgba(
+    Uint8List rgba,
+    int width,
+    int height, {
+    bool mirror = true,
+  }) {
+    if (_pending != null) {
+      throw StateError('pose worker is busy');
+    }
+    final pending = _pending = Completer<PoseNetOutput>();
+    _commands.send([
+      TransferableTypedData.fromList([rgba]),
+      width,
+      height,
+      mirror,
+    ]);
+    return pending.future;
+  }
+
   void close() {
     _pending?.completeError(StateError('pose worker closed'));
     _pending = null;
@@ -85,13 +107,34 @@ void _entry(_Boot boot) {
     boot.posenet.materialize().asUint8List(),
     boot.head.materialize().asUint8List(),
   );
+  final scratch = Float32List(modelInputSize * modelInputSize * 3);
   final commands = ReceivePort();
   boot.replies.send(commands.sendPort);
   commands.listen((message) {
     try {
-      final input = Float32List.sublistView(
-        (message as TransferableTypedData).materialize().asUint8List(),
-      );
+      final Float32List input;
+      if (message is List) {
+        final rgba = (message[0] as TransferableTypedData)
+            .materialize()
+            .asUint8List();
+        final width = message[1] as int;
+        final height = message[2] as int;
+        final mirror = message[3] as bool;
+        input = preprocessFrame(
+          width: width,
+          height: height,
+          pixelAt: (x, y) {
+            final i = (y * width + x) * 4;
+            return (rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2];
+          },
+          mirror: mirror,
+          out: scratch,
+        );
+      } else {
+        input = Float32List.sublistView(
+          (message as TransferableTypedData).materialize().asUint8List(),
+        );
+      }
       final out = engine.run(input);
       boot.replies.send([
         out.probabilities,

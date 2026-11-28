@@ -2,8 +2,8 @@ import '../../../shared/pose/pose_math.dart';
 import 'posenet_engine.dart';
 
 /// Keypoints below this score are treated as not visible (ML Kit's own cut-off
-/// is 0.5, but PoseNet's heatmap scores run lower).
-const keypointMinScore = 0.3;
+/// is 0.5, and PoseNet points below 0.4 are often background noise).
+const keypointMinScore = 0.4;
 
 const _lm = <PosePart, Lm>{
   PosePart.leftShoulder: Lm.leftShoulder,

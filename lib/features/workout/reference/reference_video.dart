@@ -2,11 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:video_player/video_player.dart';
 
-/// Where the trainer video can be shown (media_kit, bundled with the Windows
-/// build). Phones keep using the plain demo clip of `routines.video_path`.
+/// Where the trainer video can be shown: media_kit on Windows, video_player on
+/// Android/iOS/macOS.
 bool get referenceVideoSupported =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS);
+
+bool get _useMediaKit => defaultTargetPlatform == TargetPlatform.windows;
 
 /// Plays the trainer video next to the camera. The workout owns the timing:
 /// it restarts the video with each set and pauses it with the workout, so the
@@ -15,57 +22,104 @@ class ReferenceVideo {
   ReferenceVideo(this._asset);
 
   final String _asset;
-  final _player = Player();
-
-  /// Created together with the player, before any media is opened: on
-  /// Windows the video texture must exist while the first frame is decoded,
-  /// or the picture stays black until the next frame.
-  late final VideoController _controller = VideoController(_player);
+  Player? _player;
+  VideoController? _controller;
+  VideoPlayerController? _vpController;
+  bool _disposed = false;
 
   /// Loads the clip and leaves its first frame on screen (paused), so the
   /// trainer is visible before the countdown starts.
   Future<void> open() async {
-    // Touch the controller first so its texture is ready (see above).
-    _controller;
-    await _player.setVolume(0);
-    await _player.open(Media('asset:///$_asset'), play: true);
-    // A paused, never-played video shows nothing: play until the first frame
-    // is decoded, then stop at the start.
-    await _player.stream.width
-        .firstWhere((w) => w != null && w > 0)
-        .timeout(const Duration(seconds: 5), onTimeout: () => null);
-    await _player.pause();
-    await _player.seek(Duration.zero);
+    if (_useMediaKit) {
+      final player = Player();
+      final controller = VideoController(player);
+      _player = player;
+      _controller = controller;
+      // Wait for the native video texture to be created before opening media,
+      // otherwise the first frame can decode before the texture is attached.
+      await controller.platform.future;
+      if (_disposed) return;
+      await player.setVolume(0);
+      await player.open(Media('asset:///$_asset'), play: true);
+      await Future.any([
+        controller.waitUntilFirstFrameRendered,
+        player.stream.width.firstWhere((w) => w != null && w > 0),
+      ]).timeout(const Duration(seconds: 5), onTimeout: () => null);
+      if (_disposed) return;
+      await player.pause();
+      await player.seek(Duration.zero);
+    } else {
+      final vp = VideoPlayerController.asset(_asset);
+      _vpController = vp;
+      await vp.initialize();
+      if (_disposed) return;
+      await vp.setVolume(0);
+      await vp.setLooping(false);
+      await vp.seekTo(Duration.zero);
+      await vp.pause();
+    }
   }
 
   /// Width / height of the video (16:9 until it is known).
   double get aspect {
-    final w = _player.state.width, h = _player.state.height;
-    return (w == null || h == null || w <= 0 || h <= 0) ? 16 / 9 : w / h;
+    if (_useMediaKit) {
+      final w = _player?.state.width, h = _player?.state.height;
+      return (w == null || h == null || w <= 0 || h <= 0) ? 16 / 9 : w / h;
+    }
+    final vp = _vpController;
+    if (vp == null || !vp.value.isInitialized) return 16 / 9;
+    final a = vp.value.aspectRatio;
+    return a > 0 ? a : 16 / 9;
   }
 
   Future<void> restart() async {
-    await _player.seek(Duration.zero);
-    await _player.play();
+    if (_disposed) return;
+    if (_useMediaKit) {
+      await _player?.seek(Duration.zero);
+      await _player?.play();
+    } else {
+      await _vpController?.seekTo(Duration.zero);
+      await _vpController?.play();
+    }
   }
 
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    if (_disposed) return;
+    if (_useMediaKit) {
+      await _player?.play();
+    } else {
+      await _vpController?.play();
+    }
+  }
 
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    if (_disposed) return;
+    if (_useMediaKit) {
+      await _player?.pause();
+    } else {
+      await _vpController?.pause();
+    }
+  }
 
   Widget view({double radius = 12}) => ExcludeSemantics(
     child: ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: ColoredBox(
         color: Colors.black,
-        child: Video(
-          controller: _controller,
-          controls: NoVideoControls,
-          fit: BoxFit.contain,
-        ),
+        child: _useMediaKit
+            ? Video(
+                controller: _controller!,
+                controls: NoVideoControls,
+                fit: BoxFit.contain,
+              )
+            : VideoPlayer(_vpController!),
       ),
     ),
   );
 
-  Future<void> dispose() => _player.dispose();
+  Future<void> dispose() async {
+    _disposed = true;
+    await _player?.dispose();
+    await _vpController?.dispose();
+  }
 }

@@ -8,6 +8,7 @@ import 'package:wiggle_move/features/workout/reference/reference_clip.dart';
 import 'package:wiggle_move/features/workout/workout_session.dart';
 import 'package:wiggle_move/shared/backend/content_models.dart';
 import 'package:wiggle_move/shared/backend/demo_content.dart';
+import 'package:wiggle_move/shared/pose/angle_smoother.dart';
 import 'package:wiggle_move/shared/pose/pose_math.dart';
 
 ReferenceClip _clip() => ReferenceClip.fromJson(
@@ -156,6 +157,23 @@ void main() {
         Joint.leftKnee: 170,
       }, against: const MoveTarget({Joint.leftKnee: 170}));
       expect(score, 1);
+    });
+  });
+
+  group('AngleSmoother', () {
+    test('damps single-frame outlier spikes and resets after absence', () {
+      final s = AngleSmoother(alpha: 0.5, maxJumpDeg: 60, maxMissingFrames: 2);
+      expect(s.add({Joint.leftKnee: 100})[Joint.leftKnee], 100);
+      // A sudden 80-degree spike is heavily damped (k = 0.125 -> 110).
+      expect(s.add({Joint.leftKnee: 180})[Joint.leftKnee], closeTo(110, 1e-6));
+      // Normal step back to 100 settles smoothly.
+      expect(s.add({Joint.leftKnee: 100})[Joint.leftKnee], closeTo(105, 1e-6));
+
+      // Missing for > maxMissingFrames clears the joint's history.
+      for (var i = 0; i < 3; i++) {
+        expect(s.add({}), isEmpty);
+      }
+      expect(s.add({Joint.leftKnee: 160})[Joint.leftKnee], 160);
     });
   });
 }

@@ -84,20 +84,6 @@ class _Depthwise {
 }
 
 class PoseNetEngine {
-  PoseNetEngine._(
-    this._stemWeights,
-    this._stemBias,
-    this._depthwise,
-    this._pointwise,
-    this._heatmap,
-    this._offsets,
-    this._k1,
-    this._b1,
-    this._k2,
-  );
-
-  /// [posenetBytes]: the tfjs weight shards concatenated (manifest order);
-  /// [headBytes]: the Teachable Machine `model.weights.bin`.
   factory PoseNetEngine.fromBytes(Uint8List posenetBytes, Uint8List headBytes) {
     final floats = Float32List.sublistView(posenetBytes);
     var at = 0;
@@ -166,12 +152,24 @@ class PoseNetEngine {
     final heatBias = take(_parts);
     final heatKernel = take(384 * _parts);
 
+    final dwList = depthwise.sublist(1).cast<_Depthwise>();
+    final pwList = pointwise.sublist(1).cast<_Pointwise>();
+    // Pre-allocate intermediate feature map buffers once per engine instance.
+    var s = 129;
+    final dwBufs = <Float32List>[];
+    final pwBufs = <Float32List>[];
+    for (var i = 0; i < dwList.length; i++) {
+      s = (s + dwList[i].stride - 1) ~/ dwList[i].stride;
+      dwBufs.add(Float32List(s * s * dwList[i].channels));
+      pwBufs.add(Float32List(s * s * pwList[i].cout));
+    }
+
     final head = Float32List.fromList(Float32List.sublistView(headBytes));
     return PoseNetEngine._(
       stemKernel,
       stemBias,
-      depthwise.sublist(1).cast<_Depthwise>(),
-      pointwise.sublist(1).cast<_Pointwise>(),
+      dwList,
+      pwList,
       _Pointwise(384, _parts, heatKernel, heatBias),
       _Pointwise(384, 2 * _parts, offsetKernel, offsetBias),
       Float32List.sublistView(head, 0, _featureLength * _headHidden),
@@ -181,14 +179,38 @@ class PoseNetEngine {
         _featureLength * _headHidden + _headHidden,
       ),
       Float32List.sublistView(head, _featureLength * _headHidden + _headHidden),
+      dwBufs,
+      pwBufs,
     );
   }
+
+  PoseNetEngine._(
+    this._stemWeights,
+    this._stemBias,
+    this._depthwise,
+    this._pointwise,
+    this._heatmap,
+    this._offsets,
+    this._k1,
+    this._b1,
+    this._k2,
+    this._dwBufs,
+    this._pwBufs,
+  );
 
   final Float32List _stemWeights, _stemBias;
   final List<_Depthwise> _depthwise;
   final List<_Pointwise> _pointwise;
   final _Pointwise _heatmap, _offsets;
   final Float32List _k1, _b1, _k2;
+  final List<Float32List> _dwBufs;
+  final List<Float32List> _pwBufs;
+  final Float32List _rgbNorm = Float32List(257 * 257 * 3);
+  final Float32List _stemOut = Float32List(129 * 129 * 24);
+  final Float32List _heatOut = Float32List(_grid * _grid * _parts);
+  final Float32List _offOut = Float32List(_grid * _grid * 2 * _parts);
+  final Float32List _features = Float32List(_featureLength);
+  final Float32List _hidden = Float32List(_headHidden);
 
   /// [rgb]: 257x257x3 floats, RGB 0..255 (see `preprocessFrame`).
   PoseNetOutput run(Float32List rgb) {
@@ -202,14 +224,23 @@ class PoseNetEngine {
   /// The 14739 numbers the classifier head reads: sigmoid heatmaps (17) and
   /// offsets (34) per cell of the 17x17 grid, row-major.
   Float32List featuresOf(Float32List rgb) {
-    // Stem: 3x3 stride 2, SAME, 3 -> 24, relu6.
+    // Pre-normalize input once instead of dividing inside the 3x3 stem loop.
+    for (var i = 0; i < rgb.length; i++) {
+      _rgbNorm[i] = rgb[i] * (1.0 / 127.5) - 1.0;
+    }
+    // Stem: 3x3 stride 2, SAME, 3 -> 24 (6 x Float32x4), relu6.
     var size = 129;
-    var x = Float32List(size * size * 24);
+    final x = _stemOut;
+    final x4 = Float32x4List.view(x.buffer);
+    final sb4 = Float32x4List.view(_stemBias.buffer);
+    final sw4 = Float32x4List.view(_stemWeights.buffer);
+    final zero = Float32x4.zero();
+    final six = Float32x4.splat(6);
     for (var oy = 0; oy < size; oy++) {
       for (var ox = 0; ox < size; ox++) {
-        final outBase = (oy * size + ox) * 24;
-        for (var o = 0; o < 24; o++) {
-          x[outBase + o] = _stemBias[o];
+        final outBase4 = (oy * size + ox) * 6;
+        for (var o = 0; o < 6; o++) {
+          x4[outBase4 + o] = sb4[o];
         }
         for (var ky = 0; ky < 3; ky++) {
           final iy = oy * 2 + ky - 1;
@@ -219,30 +250,49 @@ class PoseNetEngine {
             if (ix < 0 || ix >= 257) continue;
             final inBase = (iy * 257 + ix) * 3;
             for (var c = 0; c < 3; c++) {
-              final v = rgb[inBase + c] / 127.5 - 1.0;
-              final wBase = ((ky * 3 + kx) * 3 + c) * 24;
-              for (var o = 0; o < 24; o++) {
-                x[outBase + o] += v * _stemWeights[wBase + o];
+              final v = Float32x4.splat(_rgbNorm[inBase + c]);
+              final wBase4 = ((ky * 3 + kx) * 3 + c) * 6;
+              for (var o = 0; o < 6; o++) {
+                x4[outBase4 + o] += v * sw4[wBase4 + o];
               }
             }
           }
         }
-        for (var o = 0; o < 24; o++) {
-          x[outBase + o] = _relu6(x[outBase + o]);
+        for (var o = 0; o < 6; o++) {
+          x4[outBase4 + o] = x4[outBase4 + o].max(zero).min(six);
         }
       }
     }
 
+    var cur = x;
     for (var i = 0; i < _depthwise.length; i++) {
       final dw = _depthwise[i];
-      final out = _depthwiseConv(x, size, dw);
+      final dwOut = _depthwiseConv(cur, size, dw, _dwBufs[i]);
       size = (size + dw.stride - 1) ~/ dw.stride;
-      x = _pointwiseConv(out, size * size, _pointwise[i], relu: true);
+      cur = _pointwiseConv(
+        dwOut,
+        size * size,
+        _pointwise[i],
+        _pwBufs[i],
+        relu: true,
+      );
     }
 
-    final heat = _pointwiseConv(x, size * size, _heatmap, relu: false);
-    final off = _pointwiseConv(x, size * size, _offsets, relu: false);
-    final features = Float32List(_featureLength);
+    final heat = _pointwiseConv(
+      cur,
+      size * size,
+      _heatmap,
+      _heatOut,
+      relu: false,
+    );
+    final off = _pointwiseConv(
+      cur,
+      size * size,
+      _offsets,
+      _offOut,
+      relu: false,
+    );
+    final features = _features;
     for (var cell = 0; cell < _grid * _grid; cell++) {
       final base = cell * (3 * _parts);
       for (var k = 0; k < _parts; k++) {
@@ -257,7 +307,7 @@ class PoseNetEngine {
 
   /// The classifier head: Dense(100, relu) then Dense(12, softmax, no bias).
   List<double> classify(Float32List features) {
-    final hidden = Float32List(_headHidden)..setAll(0, _b1);
+    final hidden = _hidden..setAll(0, _b1);
     final h4 = Float32x4List.view(hidden.buffer);
     final k4 = Float32x4List.view(
       _k1.buffer,
@@ -325,13 +375,17 @@ class PoseNetEngine {
 
   static double _relu6(double v) => v < 0 ? 0 : (v > 6 ? 6 : v);
 
-  static Float32List _depthwiseConv(Float32List x, int size, _Depthwise dw) {
+  static Float32List _depthwiseConv(
+    Float32List x,
+    int size,
+    _Depthwise dw,
+    Float32List out,
+  ) {
     final c = dw.channels;
     final c4 = c ~/ 4;
     final outSize = (size + dw.stride - 1) ~/ dw.stride;
     final padTotal = math.max((outSize - 1) * dw.stride + 3 - size, 0);
     final padBefore = padTotal ~/ 2;
-    final out = Float32List(outSize * outSize * c);
     final x4 = Float32x4List.view(x.buffer);
     final o4 = Float32x4List.view(out.buffer);
     final w4 = Float32x4List.view(
@@ -376,11 +430,11 @@ class PoseNetEngine {
   static Float32List _pointwiseConv(
     Float32List x,
     int pixels,
-    _Pointwise pw, {
+    _Pointwise pw,
+    Float32List out, {
     required bool relu,
   }) {
     final c4 = pw.cin ~/ 4;
-    final out = Float32List(pixels * pw.cout);
     final x4 = Float32x4List.view(x.buffer);
     final w4 = Float32x4List.view(pw.weights.buffer);
     for (var p = 0; p < pixels; p++) {
