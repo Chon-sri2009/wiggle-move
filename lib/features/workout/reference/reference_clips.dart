@@ -3,13 +3,21 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/pose/pose_math.dart';
 import 'reference_clip.dart';
 
 /// The trainer video of a routine and the timeline made from it.
 class ReferenceAsset {
-  const ReferenceAsset({required this.video, required this.timeline});
+  const ReferenceAsset({
+    required this.video,
+    required this.timeline,
+    this.joints,
+  });
   final String video;
   final String timeline;
+
+  /// Optional subset of joints to judge (null judges every visible joint).
+  final Set<Joint>? joints;
 }
 
 /// Routines that have a trainer video to follow, by routine id. Add an entry
@@ -19,6 +27,9 @@ const referenceAssets = <String, ReferenceAsset>{
   'video-squat-demo': ReferenceAsset(
     video: 'assets/videos/squat_reference.mp4',
     timeline: 'assets/reference/squat.timeline.json',
+    // Squat scoring focuses on lower-body form (hips & knees), not where the
+    // user holds their hands/arms.
+    joints: {Joint.leftHip, Joint.rightHip, Joint.leftKnee, Joint.rightKnee},
   ),
   'video-workout-30': ReferenceAsset(
     video: 'assets/videos/workout30.mp4',
@@ -34,5 +45,5 @@ final referenceClipProvider = FutureProvider.family<ReferenceClip?, String>((
   final asset = referenceAssets[routineId];
   if (asset == null) return null;
   final json = jsonDecode(await rootBundle.loadString(asset.timeline));
-  return ReferenceClip.fromJson(json);
+  return ReferenceClip.fromJson(json, joints: asset.joints);
 });

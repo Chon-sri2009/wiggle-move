@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/env.dart';
+import '../../shared/pose/angle_smoother.dart';
 import '../../shared/pose/pose_math.dart';
 import 'form/form_classifier.dart';
 import 'form/form_coach.dart';
@@ -66,6 +67,7 @@ class MlKitCamera implements WorkoutCamera {
   FormClassifier? _classifier;
   FormCoach? _coach;
   final _form = ValueNotifier<FormFeedback?>(null);
+  final _smoother = AngleSmoother(alpha: 0.65, maxJumpDeg: 120.0);
   final _formInput = Float32List(modelInputSize * modelInputSize * 3);
   final _formClock = Stopwatch()..start();
   int _lastFormMs = -formIntervalMs;
@@ -138,6 +140,7 @@ class MlKitCamera implements WorkoutCamera {
     void Function(Map<Joint, double> angles) onAngles,
   ) async {
     _onAngles = onAngles;
+    _smoother.reset();
     await _controller!.startImageStream(_onImage);
   }
 
@@ -146,7 +149,10 @@ class MlKitCamera implements WorkoutCamera {
     _detecting = true;
     try {
       final angles = await _pose!.detect(image, _controller!.description);
-      if (angles != null) _onAngles?.call(angles);
+      if (angles != null && angles.isNotEmpty) {
+        final smoothed = _smoother.add(angles);
+        if (smoothed.isNotEmpty) _onAngles?.call(smoothed);
+      }
       _coachFrame(image);
     } finally {
       _detecting = false;
@@ -160,20 +166,24 @@ class MlKitCamera implements WorkoutCamera {
     if (now - _lastFormMs < formIntervalMs) return;
     _lastFormMs = now;
     try {
-      final plane = image.planes.first;
       final description = _controller!.description;
       final android = defaultTargetPlatform == TargetPlatform.android;
+      final PixelAt pixelAt;
+      if (android) {
+        final nv21 = androidNv21Bytes(image);
+        if (nv21 == null) return;
+        final stride = image.planes.length == 1
+            ? image.planes.first.bytesPerRow
+            : image.width;
+        pixelAt = nv21Pixels(nv21, image.width, image.height, stride);
+      } else {
+        final plane = image.planes.first;
+        pixelAt = bgraPixels(plane.bytes, plane.bytesPerRow);
+      }
       final input = preprocessFrame(
         width: image.width,
         height: image.height,
-        pixelAt: android
-            ? nv21Pixels(
-                plane.bytes,
-                image.width,
-                image.height,
-                plane.bytesPerRow,
-              )
-            : bgraPixels(plane.bytes, plane.bytesPerRow),
+        pixelAt: pixelAt,
         rotationDegrees: description.sensorOrientation,
         // The model learned from mirrored webcam images.
         mirror: description.lensDirection == CameraLensDirection.front,

@@ -32,12 +32,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
+  // Keep the display awake while the app is open (released on exit).
+  ::SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED |
+                            ES_SYSTEM_REQUIRED);
+
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);
     ::DispatchMessage(&msg);
   }
 
+  ::SetThreadExecutionState(ES_CONTINUOUS);
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }

@@ -224,6 +224,10 @@ class WorkoutSession {
     final score = scorer.addFrame(
       angles,
       against: goal == null ? null : MoveTarget(goal),
+      // 2D video follow-along compares across different camera angles/heights,
+      // so allow wider angle tolerance than fixed single-pose exercises.
+      tolerance: goal == null ? MoveScorer.toleranceDeg : 25.0,
+      falloff: goal == null ? MoveScorer.falloffDeg : 55.0,
     );
     if (score != null) _advice.add(scorer.lastWorst, scorer.lastWorstSigned);
     return score;

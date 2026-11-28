@@ -51,8 +51,15 @@ class MoveScorer {
   /// visible to judge.
   ///
   /// [against] replaces the move's own target for this frame (a trainer video
-  /// gives a different target at every moment).
-  double? addFrame(Map<Joint, double> measured, {MoveTarget? against}) {
+  /// gives a different target at every moment). [tolerance] and [falloff]
+  /// optionally override the default angle tolerances (useful for 2D video
+  /// follow-along where camera perspective differs slightly).
+  double? addFrame(
+    Map<Joint, double> measured, {
+    MoveTarget? against,
+    double tolerance = toleranceDeg,
+    double falloff = falloffDeg,
+  }) {
     final goal = against ?? target;
     final visible = goal.angles.keys.where(measured.containsKey).toList();
     if (visible.length * 2 < goal.angles.length || visible.isEmpty) {
@@ -65,8 +72,8 @@ class MoveScorer {
     for (final joint in visible) {
       final signed = measured[joint]! - goal.angles[joint]!;
       _signedDeviations.putIfAbsent(joint, () => []).add(signed);
-      sum += _jointScore(signed.abs());
-      if (signed.abs() > toleranceDeg && signed.abs() > lastWorstSigned.abs()) {
+      sum += _jointScore(signed.abs(), tolerance: tolerance, falloff: falloff);
+      if (signed.abs() > tolerance && signed.abs() > lastWorstSigned.abs()) {
         lastWorst = joint;
         lastWorstSigned = signed;
       }
@@ -102,8 +109,12 @@ class MoveScorer {
     );
   }
 
-  static double _jointScore(double deviation) {
-    if (deviation <= toleranceDeg) return 1;
-    return (1 - (deviation - toleranceDeg) / falloffDeg).clamp(0.0, 1.0);
+  static double _jointScore(
+    double deviation, {
+    double tolerance = toleranceDeg,
+    double falloff = falloffDeg,
+  }) {
+    if (deviation <= tolerance) return 1;
+    return (1 - (deviation - tolerance) / falloff).clamp(0.0, 1.0);
   }
 }

@@ -36,7 +36,45 @@ const _landmarkMap = <PoseLandmarkType, Lm>{
 };
 
 /// Landmarks below this confidence are treated as not visible.
-const _minLikelihood = 0.5;
+const _minLikelihood = 0.4;
+
+/// Extracts a packed NV21 byte buffer from an Android [CameraImage], handling
+/// both single-plane NV21 and 3-plane YUV_420_888 (delivered by many CameraX
+/// devices even when NV21 is requested).
+Uint8List? androidNv21Bytes(CameraImage image) {
+  if (image.planes.length == 1) return image.planes.first.bytes;
+  if (image.planes.length < 3) return null;
+  final width = image.width;
+  final height = image.height;
+  final yPlane = image.planes[0];
+  final uPlane = image.planes[1];
+  final vPlane = image.planes[2];
+  final out = Uint8List(width * height + (width * height) ~/ 2);
+  var dst = 0;
+  final yBytes = yPlane.bytes;
+  final yStride = yPlane.bytesPerRow;
+  for (var r = 0; r < height; r++) {
+    final rowStart = r * yStride;
+    for (var c = 0; c < width; c++) {
+      out[dst++] = yBytes[rowStart + c];
+    }
+  }
+  final uBytes = uPlane.bytes;
+  final vBytes = vPlane.bytes;
+  final uvStride = uPlane.bytesPerRow;
+  final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+  final halfH = height ~/ 2;
+  final halfW = width ~/ 2;
+  for (var r = 0; r < halfH; r++) {
+    final rowStart = r * uvStride;
+    for (var c = 0; c < halfW; c++) {
+      final idx = rowStart + c * uvPixelStride;
+      out[dst++] = vBytes[idx];
+      out[dst++] = uBytes[idx];
+    }
+  }
+  return out;
+}
 
 /// Wraps ML Kit: camera frame in, joint angles out.
 /// The app is locked to portrait, so image rotation equals sensor orientation.
@@ -72,10 +110,26 @@ class PoseService {
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
     if (rotation == null || format == null) return null;
 
-    final expected = defaultTargetPlatform == TargetPlatform.android
-        ? InputImageFormat.nv21
-        : InputImageFormat.bgra8888;
-    if (format != expected || image.planes.length != 1) return null;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final bytes = androidNv21Bytes(image);
+      if (bytes == null) return null;
+      final bytesPerRow = image.planes.length == 1
+          ? image.planes.first.bytesPerRow
+          : image.width;
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: InputImageFormat.nv21,
+          bytesPerRow: bytesPerRow,
+        ),
+      );
+    }
+
+    if (format != InputImageFormat.bgra8888 || image.planes.length != 1) {
+      return null;
+    }
 
     final plane = image.planes.first;
     return InputImage.fromBytes(

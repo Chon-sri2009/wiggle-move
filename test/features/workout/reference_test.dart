@@ -50,6 +50,34 @@ void main() {
       expect(clip.targetAt(-5000, {}), isNotNull);
       expect(clip.targetAt(60000, {}), isNotNull);
     });
+
+    test('joints filter keeps only requested joints', () {
+      final filtered = ReferenceClip.fromJson(
+        jsonDecode(
+          File('assets/reference/squat.timeline.json').readAsStringSync(),
+        ),
+        joints: const {
+          Joint.leftHip,
+          Joint.rightHip,
+          Joint.leftKnee,
+          Joint.rightKnee,
+        },
+      );
+      final target = filtered.targetAt(2000, {})!;
+      expect(
+        target.keys,
+        everyElement(
+          isIn(const [
+            Joint.leftHip,
+            Joint.rightHip,
+            Joint.leftKnee,
+            Joint.rightKnee,
+          ]),
+        ),
+      );
+      expect(target.containsKey(Joint.leftElbow), isFalse);
+      expect(target.containsKey(Joint.rightElbow), isFalse);
+    });
   });
 
   group('LiveAdvice', () {

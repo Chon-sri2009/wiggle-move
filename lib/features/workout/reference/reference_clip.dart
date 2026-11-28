@@ -12,23 +12,35 @@ class ReferenceClip {
 
   /// [json] is the tool's output. [mirrored] swaps left and right: a trainer
   /// who faces the camera is copied as in a mirror, so the user's right arm
-  /// follows the trainer's left.
-  factory ReferenceClip.fromJson(Object? json, {bool mirrored = true}) {
+  /// follows the trainer's left. When [joints] is given, only those joints are
+  /// judged (e.g. hips and knees for a squat video, ignoring noisy arm motion).
+  factory ReferenceClip.fromJson(
+    Object? json, {
+    bool mirrored = true,
+    Set<Joint>? joints,
+  }) {
     final map = json as Map<String, dynamic>;
     final samples = (map['samples'] as List<dynamic>).cast<List<dynamic>>();
     final hz = (map['hz'] as num).toDouble();
     return ReferenceClip._(1000 / hz, (map['durationMs'] as num).toInt(), [
       for (final row in samples)
-        measureAngles(
-          landmarksFromKeypoints([
-            for (var k = 0; k < 17; k++)
-              PoseKeypoint(
-                (row[3 * k] as num).toDouble(),
-                (row[3 * k + 1] as num).toDouble(),
-                (row[3 * k + 2] as num).toDouble(),
-              ),
-          ], mirrored: mirrored),
-        ),
+        () {
+          final all = measureAngles(
+            landmarksFromKeypoints([
+              for (var k = 0; k < 17; k++)
+                PoseKeypoint(
+                  (row[3 * k] as num).toDouble(),
+                  (row[3 * k + 1] as num).toDouble(),
+                  (row[3 * k + 2] as num).toDouble(),
+                ),
+            ], mirrored: mirrored),
+          );
+          if (joints == null) return all;
+          return {
+            for (final e in all.entries)
+              if (joints.contains(e.key)) e.key: e.value,
+          };
+        }(),
     ]);
   }
 
@@ -36,9 +48,10 @@ class ReferenceClip {
   final int durationMs;
   final List<Map<Joint, double>> _angles;
 
-  /// People start a little after the trainer; allow that much lag.
-  static const lagMs = 700;
-  static const leadMs = 200;
+  /// People react slightly after (or anticipate slightly ahead of) the trainer
+  /// on screen; allow generous timing slack so following the video feels fair.
+  static const lagMs = 1500;
+  static const leadMs = 500;
 
   /// The trainer's angles to judge [measured] against at [offsetMs] into the
   /// clip: of the samples within the lag/lead window, the one the user is
