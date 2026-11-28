@@ -16,6 +16,7 @@ final leaderboardRepositoryProvider = Provider<LeaderboardRepository>((ref) {
     return OfflineLeaderboardRepository(
       ref.watch(sharedPrefsProvider),
       playerName: () => ref.read(authUserProvider)?.displayName,
+      includeDemoPlayers: true,
       routineIdsIn: (category) async => {
         for (final t
             in await ref.read(contentRepositoryProvider).fetchTrainers())

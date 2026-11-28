@@ -7,7 +7,9 @@ import '../../shared/backend/sessions_providers.dart';
 import '../../shared/backend/sessions_repository.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/primary_button.dart';
+import '../playlist/playlist_store.dart';
 import '../scoring/move_scorer.dart';
+import '../trainers/trainers_provider.dart';
 import '../workout/workout_session.dart';
 import '../../shared/widgets/content_width.dart';
 import '../../shared/l10n/app_language.dart';
@@ -27,7 +29,7 @@ class SummaryArgs {
   final bool fromHistory;
 }
 
-class SummaryScreen extends StatelessWidget {
+class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({
     super.key,
     required this.summary,
@@ -45,9 +47,26 @@ class SummaryScreen extends StatelessWidget {
   static const queuedText = "Will upload when you're back online";
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final total = summary.totalScore;
+    final activePlaylist = fromHistory
+        ? null
+        : ref.watch(activePlaylistProvider);
+    final matchesPlaylist =
+        activePlaylist != null &&
+        activePlaylist.currentRoutineId == summary.routine.id;
+    final nextRoutineId = matchesPlaylist ? activePlaylist.nextRoutineId : null;
+    final nextRoutineName = nextRoutineId == null
+        ? null
+        : ref
+              .watch(trainersProvider)
+              .value
+              ?.trainers
+              .expand((t) => t.routines)
+              .where((r) => r.id == nextRoutineId)
+              .firstOrNull
+              ?.name;
     return Scaffold(
       appBar: AppBar(
         title: Text(fromHistory ? 'Past session' : 'Session summary'),
@@ -102,12 +121,64 @@ class SummaryScreen extends StatelessWidget {
             for (final outcome in summary.outcomes)
               _MoveCard(outcome, summary.routine.sets),
             const SizedBox(height: 16),
+            if (matchesPlaylist) ...[
+              AppCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '${activePlaylist.playlistName} · '
+                      '${activePlaylist.index + 1} / ${activePlaylist.total}',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accentDeep,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (nextRoutineId != null)
+                      PrimaryButton(
+                        label: nextRoutineName != null
+                            ? context.tr('Next in playlist: {name}', {
+                                'name': nextRoutineName,
+                              })
+                            : context.tr('Next in playlist'),
+                        onPressed: () {
+                          final next = ref
+                              .read(activePlaylistProvider.notifier)
+                              .advanceToNext();
+                          if (next != null) {
+                            context.pushReplacement('/workout/$next');
+                          }
+                        },
+                      )
+                    else
+                      Text(
+                        context.tr('Playlist complete!'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             PrimaryButton(
-              onPressed: () => context.go('/leaderboard'),
+              onPressed: () {
+                ref.read(activePlaylistProvider.notifier).clear();
+                context.go('/leaderboard');
+              },
               label: 'See leaderboard',
             ),
             TextButton(
-              onPressed: () => context.go('/'),
+              onPressed: () {
+                ref.read(activePlaylistProvider.notifier).clear();
+                context.go('/');
+              },
               child: Text(context.tr('Back to trainers')),
             ),
           ],

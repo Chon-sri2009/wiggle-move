@@ -9,6 +9,7 @@ import '../../shared/backend/content_models.dart';
 import '../../shared/widgets/async_states.dart';
 import '../../shared/backend/profile.dart';
 import '../../shared/backend/trainer_photo.dart';
+import '../playlist/playlist_store.dart';
 import '../profile/profile_store.dart';
 import '../trainers/content_gate.dart';
 import '../trainers/personalization.dart';
@@ -33,6 +34,11 @@ class HomeScreen extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
+          IconButton(
+            tooltip: context.tr('Playlists'),
+            icon: const Icon(Icons.playlist_play),
+            onPressed: () => context.push('/playlists'),
+          ),
           IconButton(
             tooltip: context.tr('Profile'),
             icon: const Icon(Icons.account_circle_outlined),
@@ -61,7 +67,9 @@ class HomeScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              _PlaylistsBanner(count: ref.watch(playlistsProvider).length),
+              const SizedBox(height: 8),
               ...switch (content) {
                 AsyncValue(:final value?) => [
                   if (value.isStale) const _StaleNote(),
@@ -184,6 +192,39 @@ class _TrainerCard extends StatelessWidget {
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/trainer/${trainer.id}'),
+      ),
+    );
+  }
+}
+
+class _PlaylistsBanner extends StatelessWidget {
+  const _PlaylistsBanner({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppCard(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
+        ),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.14),
+          foregroundColor: AppColors.primary,
+          child: const Icon(Icons.playlist_play),
+        ),
+        title: Text(
+          context.tr('My Playlists'),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(context.trCount('1 playlist', '{n} playlists', count)),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/playlists'),
       ),
     );
   }

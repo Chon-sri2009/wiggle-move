@@ -39,7 +39,10 @@ class WorkoutScreen extends ConsumerStatefulWidget {
 
 class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     with WidgetsBindingObserver {
-  late final WorkoutSession _session = WorkoutSession(widget.routine);
+  late final WorkoutSession _session = WorkoutSession(
+    widget.routine,
+    advanceOnTargetReps: true,
+  );
   late final _clock = PlayClock(ref.read(playNowMsProvider));
   WorkoutCamera? _camera;
   ReferenceVideo? _video;
@@ -153,9 +156,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     _timer = Timer.periodic(const Duration(milliseconds: 100), _onTick);
   }
 
-  void _onTick(Timer timer) {
-    if (_paused || _finished) return;
-    _session.advance(_clock.elapsedMs);
+  void _syncSegmentState() {
     if (_session.isDone) {
       _finish();
       return;
@@ -176,7 +177,13 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
         unawaited(_video?.restart());
       }
     }
-    setState(() {});
+  }
+
+  void _onTick(Timer timer) {
+    if (_paused || _finished) return;
+    _session.advance(_clock.elapsedMs);
+    _syncSegmentState();
+    if (!_finished && mounted) setState(() {});
   }
 
   void _onAngles(Map<Joint, double> angles) {
@@ -184,7 +191,18 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     final reps = _session.repCount;
     final score = _session.addFrame(angles);
     if (_session.repCount > reps) _cues.repCounted();
-    if (score != null && mounted) setState(() => _live = score);
+    _syncSegmentState();
+    if (_finished || !mounted) return;
+    setState(() {
+      if (score != null) _live = score;
+    });
+  }
+
+  void _skipRest() {
+    if (!_running || _paused || _finished || !_session.isResting) return;
+    _session.skipRest();
+    _syncSegmentState();
+    if (!_finished && mounted) setState(() {});
   }
 
   void _cameraStopped() => _fail(
@@ -371,7 +389,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                     ),
                   if (active)
                     _session.isResting
-                        ? _RestPanel(session: _session)
+                        ? _RestPanel(session: _session, onSkipRest: _skipRest)
                         : _MovePanel(
                             session: _session,
                             live: _live,
@@ -610,10 +628,14 @@ class _MovePanel extends StatelessWidget {
     final liveLabel = live >= 0.8
         ? 'Good'
         : (live >= 0.5 ? 'Adjust' : 'Off target');
+    final left = session.setsRemaining;
+    final leftLabel = left == 0
+        ? context.tr('Final set')
+        : context.trCount('1 set left', '{n} sets left', left);
     final header = [
       if (session.routine.sets > 1)
-        'Set ${session.setIndex + 1} of ${session.routine.sets}',
-      'Move ${session.moveIndex + 1} of $total',
+        '${context.tr('Set {a} of {b}', {'a': session.setIndex + 1, 'b': session.routine.sets})} · $leftLabel',
+      context.tr('Move {a} of {b}', {'a': session.moveIndex + 1, 'b': total}),
     ].join(' · ');
     return _Panel(
       children: [
@@ -744,20 +766,28 @@ class _MovePanel extends StatelessWidget {
 
 /// Between sets: counts the rest down and names what comes next.
 class _RestPanel extends StatelessWidget {
-  const _RestPanel({required this.session});
+  const _RestPanel({required this.session, required this.onSkipRest});
   final WorkoutSession session;
+  final VoidCallback onSkipRest;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final seconds = (session.restRemainingMs / 1000).ceil();
+    final left = session.setsRemaining;
+    final leftText = left == 1
+        ? context.tr('Final set next')
+        : context.tr('{n} sets left', {'n': left});
     return _Panel(
       children: [
         // Only the heading is live: announcing every second would be noise.
         Semantics(
           liveRegion: true,
           child: Text(
-            'Rest · set ${session.setIndex + 2} of ${session.routine.sets} next',
+            '${context.tr('Rest')} · '
+            '${context.tr('Set {a} of {b}', {'a': session.setIndex + 2, 'b': session.routine.sets})} · '
+            '$leftText',
+            textAlign: TextAlign.center,
             style: theme.textTheme.labelLarge?.copyWith(color: Colors.white70),
           ),
         ),
@@ -769,8 +799,17 @@ class _RestPanel extends StatelessWidget {
           ),
         ),
         Text(
-          'Next: ${session.currentMove.name}',
+          context.tr('Next: {name}', {'name': session.currentMove.name}),
           style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: onSkipRest,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white70),
+          ),
+          child: Text(context.tr('Start next set')),
         ),
       ],
     );

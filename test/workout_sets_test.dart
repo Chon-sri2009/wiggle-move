@@ -194,4 +194,52 @@ void main() {
     );
     expect(sum.calories, 1); // 3.5 MET for 10 s is about 0.7 kcal
   });
+
+  test('advanceOnTargetReps ends each set immediately on target reps and tracks setsRemaining', () {
+    final s = WorkoutSession(
+      _routine(sets: 3, rest: 5000),
+      advanceOnTargetReps: true,
+    );
+    expect(s.setIndex, 0);
+    expect(s.setsRemaining, 2);
+
+    // Finish 3 reps at t=2s without waiting for the 10s timer.
+    s.advance(2000);
+    for (var i = 0; i < 3; i++) {
+      _rep(s);
+    }
+    expect(s.isResting, isTrue);
+    expect(s.setsRemaining, 2);
+    expect(s.restRemainingMs, 5000);
+
+    // Skip rest directly into set 2.
+    s.skipRest();
+    expect(s.isResting, isFalse);
+    expect(s.setIndex, 1);
+    expect(s.setsRemaining, 1);
+
+    // Finish set 2 early -> enters rest before final set.
+    s.advance(4000);
+    for (var i = 0; i < 3; i++) {
+      _rep(s);
+    }
+    expect(s.isResting, isTrue);
+    expect(s.setsRemaining, 1);
+
+    // Wait out the 5s rest -> final set.
+    s.advance(9000);
+    expect(s.isResting, isFalse);
+    expect(s.setIndex, 2);
+    expect(s.setsRemaining, 0);
+
+    // Finish final set early -> workout done immediately.
+    s.advance(11000);
+    for (var i = 0; i < 3; i++) {
+      _rep(s);
+    }
+    expect(s.isDone, isTrue);
+    final r = s.summary().outcomes.single.result;
+    expect(r.reps, 9);
+    expect(r.score, 100);
+  });
 }

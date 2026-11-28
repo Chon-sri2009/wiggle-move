@@ -19,6 +19,7 @@ import 'theme.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
+import '../features/playlist/playlist_screens.dart';
 import '../features/search/search_screen.dart';
 import '../features/summary/summary_screen.dart';
 import '../features/trainers/content_gate.dart';
@@ -129,6 +130,12 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
       ],
     ),
     GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
+    GoRoute(path: '/playlists', builder: (c, s) => const PlaylistsScreen()),
+    GoRoute(
+      path: '/playlists/:id',
+      builder: (c, s) =>
+          PlaylistDetailScreen(playlistId: s.pathParameters['id']!),
+    ),
     GoRoute(
       path: '/trainer/:id',
       builder: (context, state) => ContentGate<Trainer>(

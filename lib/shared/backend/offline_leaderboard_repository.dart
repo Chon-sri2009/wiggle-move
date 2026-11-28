@@ -88,6 +88,117 @@ String localPlayerKey(String raw) {
   return t.isEmpty ? 'Player' : t;
 }
 
+/// Sample community players for WM_OFFLINE so the leaderboard feels alive and
+/// gives the user realistic targets to beat across every category and routine.
+List<LocalPlay> demoLeaderboardPlays(DateTime now) {
+  final utc = now.toUtc();
+  final weekStart = _weekStart(utc);
+  // Keep every timestamp within [weekStart, utc] so weekly & all-time both show.
+  DateTime at(int minutesAfterMonday) {
+    final t = weekStart.add(Duration(minutes: minutesAfterMonday));
+    return t.isAfter(utc) ? utc.subtract(const Duration(minutes: 1)) : t;
+  }
+
+  const players = <(String, Map<String, int>)>[
+    (
+      'Ploy',
+      {
+        'video-squat-demo': 96,
+        'squat-sets': 94,
+        'cardio-burn': 92,
+        'pop-starter': 95,
+        'disco-fever': 91,
+        'cardio-circuit': 90,
+      },
+    ),
+    (
+      'Bank',
+      {
+        'video-squat-demo': 93,
+        'squat-sets': 95,
+        'cardio-circuit': 92,
+        'cardio-burn': 89,
+        'pop-starter': 88,
+      },
+    ),
+    (
+      'Mint',
+      {
+        'video-squat-demo': 91,
+        'pop-starter': 94,
+        'disco-fever': 93,
+        'cardio-burn': 87,
+        'squat-sets': 86,
+      },
+    ),
+    (
+      'Tae',
+      {
+        'video-squat-demo': 88,
+        'squat-sets': 90,
+        'cardio-circuit': 87,
+        'video-workout-30': 85,
+        'disco-fever': 84,
+      },
+    ),
+    (
+      'Fah',
+      {
+        'video-squat-demo': 85,
+        'pop-starter': 91,
+        'cardio-burn': 84,
+        'squat-sets': 82,
+      },
+    ),
+    (
+      'Khao',
+      {
+        'video-squat-demo': 82,
+        'disco-fever': 88,
+        'cardio-circuit': 81,
+        'squat-sets': 80,
+      },
+    ),
+    (
+      'Beam',
+      {
+        'video-squat-demo': 79,
+        'cardio-burn': 83,
+        'pop-starter': 81,
+        'squat-sets': 78,
+      },
+    ),
+    (
+      'NongPim',
+      {
+        'video-squat-demo': 76,
+        'pop-starter': 79,
+        'disco-fever': 75,
+        'cardio-burn': 74,
+      },
+    ),
+    ('Ken', {'video-squat-demo': 72, 'squat-sets': 75, 'cardio-circuit': 71}),
+    ('Grace', {'video-squat-demo': 68, 'pop-starter': 74, 'cardio-burn': 69}),
+  ];
+
+  final out = <LocalPlay>[];
+  var offset = 10;
+  for (final (name, scores) in players) {
+    for (final entry in scores.entries) {
+      out.add(
+        LocalPlay(
+          playerName: name,
+          routineId: entry.key,
+          score: entry.value,
+          playedAt: at(offset),
+        ),
+      );
+      offset += 7;
+    }
+  }
+  return out;
+}
+
 /// WM_OFFLINE leaderboard over the plays that `OfflineSessionsRepository`
 /// stored on this device.
 class OfflineLeaderboardRepository implements LeaderboardRepository {
@@ -95,6 +206,7 @@ class OfflineLeaderboardRepository implements LeaderboardRepository {
     this._prefs, {
     required this.playerName,
     required this.routineIdsIn,
+    this.includeDemoPlayers = false,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -103,6 +215,7 @@ class OfflineLeaderboardRepository implements LeaderboardRepository {
 
   /// Ids of the routines of a category (the content is not known here).
   final Future<Set<String>> Function(String category) routineIdsIn;
+  final bool includeDemoPlayers;
   final DateTime Function() _now;
 
   @override
@@ -111,13 +224,20 @@ class OfflineLeaderboardRepository implements LeaderboardRepository {
     required LeaderboardPeriod period,
     int limit = 50,
     String? category,
-  }) async => computeLocalLeaderboard(
-    readLocalPlays(_prefs),
-    routineId: routineId,
-    routineIds: category == null ? null : await routineIdsIn(category),
-    period: period,
-    limit: limit,
-    me: playerName(),
-    now: _now(),
-  );
+  }) async {
+    final now = _now();
+    final plays = [
+      if (includeDemoPlayers) ...demoLeaderboardPlays(now),
+      ...readLocalPlays(_prefs),
+    ];
+    return computeLocalLeaderboard(
+      plays,
+      routineId: routineId,
+      routineIds: category == null ? null : await routineIdsIn(category),
+      period: period,
+      limit: limit,
+      me: playerName(),
+      now: now,
+    );
+  }
 }

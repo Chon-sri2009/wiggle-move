@@ -7,6 +7,8 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/backend/content_models.dart';
 import '../../shared/backend/profile.dart';
 import '../home/home_screen.dart' show TrainerAvatar;
+import '../playlist/playlist_screens.dart';
+import '../playlist/playlist_store.dart';
 import '../profile/profile_store.dart';
 import 'personalization.dart';
 import '../../shared/widgets/content_width.dart';
@@ -59,12 +61,29 @@ class TrainerScreen extends ConsumerWidget {
                     '${context.durationLabel(routine.totalDurationMs)}'
                     '${isRecommended(routine, profile) ? context.tr(' · Recommended') : ''}',
                   ),
-                  trailing: const Icon(
-                    Icons.play_circle_outline,
-                    size: IconSize.xl,
-                    color: AppColors.primary,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: context.tr('Add to playlist'),
+                        icon: const Icon(
+                          Icons.playlist_add,
+                          color: AppColors.accentDeep,
+                        ),
+                        onPressed: () =>
+                            showAddToPlaylistSheet(context, ref, routine),
+                      ),
+                      const Icon(
+                        Icons.play_circle_outline,
+                        size: IconSize.xl,
+                        color: AppColors.primary,
+                      ),
+                    ],
                   ),
-                  onTap: () => context.push('/workout/${routine.id}'),
+                  onTap: () {
+                    ref.read(activePlaylistProvider.notifier).clear();
+                    context.push('/workout/${routine.id}');
+                  },
                 ),
               ),
           ],

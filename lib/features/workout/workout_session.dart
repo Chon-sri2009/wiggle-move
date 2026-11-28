@@ -104,7 +104,7 @@ class _Segment {
 /// min(1, reps / target) for that set, so skipping reps costs points. Frames
 /// during a rest are ignored.
 class WorkoutSession {
-  WorkoutSession(this.routine)
+  WorkoutSession(this.routine, {this.advanceOnTargetReps = false})
     : _results = [for (final _ in routine.moves) <MoveResult>[]] {
     var t = 0;
     for (var s = 0; s < routine.sets; s++) {
@@ -122,6 +122,10 @@ class WorkoutSession {
   }
 
   final Routine routine;
+
+  /// When true, completing the target rep count for a counted move finishes
+  /// that segment immediately instead of waiting for the remaining timer.
+  final bool advanceOnTargetReps;
 
   /// A trainer video's joint angles over time. When set, frames are judged
   /// against what the trainer does at that moment of each set instead of the
@@ -146,6 +150,10 @@ class WorkoutSession {
 
   /// 0-based set being played (or just finished, during a rest).
   int get setIndex => isDone ? routine.sets - 1 : _segments[_index].set;
+
+  /// Number of sets still remaining AFTER the current set (during a rest, this
+  /// equals the number of sets left to play including the upcoming set).
+  int get setsRemaining => (routine.sets - 1 - setIndex).clamp(0, routine.sets);
 
   /// The active move; during a rest, the move that comes next.
   int get moveIndex {
@@ -198,6 +206,29 @@ class WorkoutSession {
     _begin();
   }
 
+  void _finishSegmentEarly() {
+    if (isDone) return;
+    final savedMs = (_segments[_index].endMs - _elapsedMs).clamp(0, 1 << 30);
+    if (savedMs > 0) {
+      for (var i = _index; i < _segments.length; i++) {
+        final seg = _segments[i];
+        _segments[i] = _Segment(
+          seg.set,
+          seg.move,
+          seg.endMs - savedMs,
+          i == _index ? seg.setStartMs : seg.setStartMs - savedMs,
+        );
+      }
+    }
+    _finishSegment();
+  }
+
+  /// Ends the current rest segment immediately and starts the next set.
+  void skipRest() {
+    if (!isResting) return;
+    _finishSegmentEarly();
+  }
+
   /// Moves to the segment active at [elapsedMs], finalizing any passed.
   void advance(int elapsedMs) {
     _elapsedMs = elapsedMs;
@@ -230,6 +261,9 @@ class WorkoutSession {
       falloff: goal == null ? MoveScorer.falloffDeg : 55.0,
     );
     if (score != null) _advice.add(scorer.lastWorst, scorer.lastWorstSigned);
+    if (advanceOnTargetReps && rep != null && _counter!.count >= rep.target) {
+      _finishSegmentEarly();
+    }
     return score;
   }
 
