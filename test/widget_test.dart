@@ -54,6 +54,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Sign up'));
     await tester.tap(find.text('Sign up'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Sign up'), findsOneWidget);
@@ -86,6 +87,7 @@ void main() {
   testWidgets('offline sign up -> personalize -> home', (tester) async {
     await tester.pumpWidget(await _app());
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Sign up'));
     await tester.tap(find.text('Sign up'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Name'), 'Cy');
@@ -115,7 +117,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Create My Workout Plan'));
     await tester.pumpAndSettle();
-    expect(find.text('Hi, Cy'), findsOneWidget);
+    expect(find.text('Hello, Cy'), findsOneWidget);
   });
 
   testWidgets('personalization flow ends on home', (tester) async {
@@ -150,7 +152,7 @@ void main() {
     await tester.tap(find.text('Create My Workout Plan'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Hi, Ann'), findsOneWidget);
+    expect(find.text('Hello, Ann'), findsOneWidget);
     expect(find.text('Coach Mia'), findsOneWidget);
   });
 

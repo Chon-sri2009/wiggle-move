@@ -136,6 +136,9 @@ void main() {
   test('trainerInitial never throws on odd names', () {
     expect(trainerInitial('Coach Mia'), 'M');
     expect(trainerInitial('Coach Mia '), 'M');
+    // A "(note)" suffix is not the initial.
+    expect(trainerInitial('Video Coach (demo)'), 'C');
+    expect(trainerInitial('(demo)'), '(');
     expect(trainerInitial('Jay'), 'J');
     expect(trainerInitial(''), '?');
     expect(trainerInitial('   '), '?');

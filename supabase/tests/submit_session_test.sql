@@ -4,7 +4,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(22);
+select plan(24);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (as the migration owner). Users A and B; routine with 2 moves.
@@ -30,22 +30,22 @@ values
 -- 1-4: privileges and definition.
 select ok(
   not has_function_privilege('anon',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer, timestamp with time zone)', 'execute'),
   'anon has no execute on submit_session_tx'
 );
 select ok(
   not has_function_privilege('authenticated',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer, timestamp with time zone)', 'execute'),
   'authenticated has no execute on submit_session_tx'
 );
 select ok(
   has_function_privilege('service_role',
-    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)', 'execute'),
+    'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer, timestamp with time zone)', 'execute'),
   'service_role has execute on submit_session_tx'
 );
 select is(
   (select prosecdef from pg_catalog.pg_proc
-    where oid = 'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer)'::regprocedure),
+    where oid = 'public.submit_session_tx(uuid, text, uuid, integer, integer, jsonb, integer, timestamp with time zone)'::regprocedure),
   true,
   'submit_session_tx is security definer'
 );
@@ -222,6 +222,24 @@ select throws_ok(
 );
 
 reset role;
+
+-- 23-24: p_played_at is stored as given; null means now().
+select is(
+  (select duplicate from public.submit_session_tx(
+    '00000000-0000-0000-0000-0000000002a1', 'st-r1',
+    '00000000-0000-0000-0000-0000000002f9', 70, 8000,
+    '[{"move_idx": 0, "score": 70, "worst_joint": null, "deviation": null},
+      {"move_idx": 1, "score": 70, "worst_joint": null, "deviation": null}]',
+    1, '2026-01-04 23:50:00+00')),
+  false,
+  'submit with played_at stored'
+);
+select is(
+  (select played_at from public.sessions
+    where client_nonce = '00000000-0000-0000-0000-0000000002f9'),
+  '2026-01-04 23:50:00+00'::timestamptz,
+  'played_at is the client play time, not the upload time'
+);
 
 select * from finish();
 rollback;

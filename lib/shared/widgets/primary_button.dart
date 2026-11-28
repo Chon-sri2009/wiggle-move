@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_language.dart';
+
 /// Filled theme button. While [loading] it shows a spinner and is disabled.
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
@@ -23,7 +25,7 @@ class PrimaryButton extends StatelessWidget {
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Text(label),
+          : Text(context.tr(label)),
     );
   }
 }

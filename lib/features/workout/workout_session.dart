@@ -1,6 +1,8 @@
 import 'dart:math' show min;
 
 import '../scoring/move_scorer.dart';
+import 'live_advice.dart';
+import 'reference/reference_clip.dart';
 import '../../shared/pose/pose_math.dart';
 import '../../shared/pose/rep_counter.dart';
 import '../../shared/backend/content_models.dart';
@@ -84,10 +86,14 @@ class SessionSummary {
 
 /// A stretch of the timeline: one move of one set, or a rest ([move] null).
 class _Segment {
-  const _Segment(this.set, this.move, this.endMs);
+  const _Segment(this.set, this.move, this.endMs, this.setStartMs);
   final int set;
   final int? move;
   final int endMs;
+
+  /// When the set this segment belongs to began (a trainer clip restarts
+  /// with each set).
+  final int setStartMs;
 }
 
 /// Tracks the active move/set/rest for a routine and scores frames against
@@ -102,19 +108,32 @@ class WorkoutSession {
     : _results = [for (final _ in routine.moves) <MoveResult>[]] {
     var t = 0;
     for (var s = 0; s < routine.sets; s++) {
+      final setStart = t;
       for (var i = 0; i < routine.moves.length; i++) {
         t += routine.moves[i].durationMs;
-        _segments.add(_Segment(s, i, t));
+        _segments.add(_Segment(s, i, t, setStart));
       }
       if (s < routine.sets - 1 && routine.restMs > 0) {
         t += routine.restMs;
-        _segments.add(_Segment(s, null, t));
+        _segments.add(_Segment(s, null, t, setStart));
       }
     }
     _begin();
   }
 
   final Routine routine;
+
+  /// A trainer video's joint angles over time. When set, frames are judged
+  /// against what the trainer does at that moment of each set instead of the
+  /// move's fixed target.
+  ReferenceClip? reference;
+
+  final _advice = LiveAdvice();
+
+  /// Warning + what to fix right now ("Bend your left knee more"), or null
+  /// when the user is on track.
+  String? get advice => _advice.message;
+
   final List<_Segment> _segments = [];
   final List<List<MoveResult>> _results; // per move, one entry per set
   int _index = 0;
@@ -146,6 +165,7 @@ class WorkoutSession {
   void _begin() {
     _scorer = null;
     _counter = null;
+    _advice.reset();
     if (isDone) return;
     final m = _segments[_index].move;
     if (m == null) return;
@@ -196,7 +216,17 @@ class WorkoutSession {
       final angle = angles[rep.joint];
       if (angle != null) _counter!.update(angle);
     }
-    return scorer.addFrame(angles);
+    final clip = reference;
+    final goal = clip?.targetAt(
+      _elapsedMs - _segments[_index].setStartMs,
+      angles,
+    );
+    final score = scorer.addFrame(
+      angles,
+      against: goal == null ? null : MoveTarget(goal),
+    );
+    if (score != null) _advice.add(scorer.lastWorst, scorer.lastWorstSigned);
+    return score;
   }
 
   SessionSummary summary({int? durationMs}) {

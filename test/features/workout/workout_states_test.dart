@@ -38,7 +38,10 @@ void main() {
 
     test('unsupported platform and missing camera cannot be retried', () {
       expect(unsupportedPlatformFailure.canRetry, isFalse);
-      expect(unsupportedPlatformFailure.message, contains('Android and iOS'));
+      expect(
+        unsupportedPlatformFailure.message,
+        contains('Android, iOS and Windows'),
+      );
       expect(noCameraFailure.canRetry, isFalse);
     });
   });
@@ -88,10 +91,10 @@ void main() {
     testWidgets('unsupported platform explains and offers only Back', (
       tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       try {
         await pumpScreen(tester);
-        expect(find.textContaining('Android and iOS'), findsOneWidget);
+        expect(find.textContaining('Android, iOS and Windows'), findsOneWidget);
         expect(find.text('Try again'), findsNothing);
         expect(find.text('Back'), findsOneWidget);
       } finally {

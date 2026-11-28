@@ -13,6 +13,11 @@ class SupabaseAuthRepository implements AuthRepository {
 
   static const deleteFunctionName = 'delete_account';
 
+  /// Where the reset email link opens the app (scheme registered in
+  /// AndroidManifest.xml and Info.plist; also add it to the Supabase
+  /// project's redirect URLs).
+  static const resetRedirect = 'wigglemove://reset-callback';
+
   final GoTrueClient _auth;
   final FunctionsClient _functions;
   final Duration timeout;
@@ -46,8 +51,18 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> signOut() => _guard(_auth.signOut);
 
   @override
-  Future<void> sendPasswordReset(String email) =>
-      _guard(() => _auth.resetPasswordForEmail(email));
+  Future<void> sendPasswordReset(String email) => _guard(
+    () => _auth.resetPasswordForEmail(email, redirectTo: resetRedirect),
+  );
+
+  @override
+  Stream<void> get passwordRecovery => _auth.onAuthStateChange
+      .where((s) => s.event == AuthChangeEvent.passwordRecovery)
+      .map((_) {});
+
+  @override
+  Future<void> updatePassword(String password) =>
+      _guard(() => _auth.updateUser(UserAttributes(password: password)));
 
   @override
   Future<void> updateDisplayName(String name) => _guard(

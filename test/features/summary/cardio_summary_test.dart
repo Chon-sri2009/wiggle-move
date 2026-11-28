@@ -83,7 +83,7 @@ void main() {
     final jay = builtInTrainers.last;
     await tester.pumpWidget(_app(TrainerScreen(trainer: jay)));
     // 3 x 30 s + 2 x 20 s rests = 130 s.
-    expect(find.text('Easy · 1 moves · 3 sets · 130s'), findsOneWidget);
+    expect(find.text('Easy · 1 move · 3 sets · 2m 10s'), findsOneWidget);
     expect(find.text('Medium · 6 moves · 24s'), findsOneWidget);
   });
 

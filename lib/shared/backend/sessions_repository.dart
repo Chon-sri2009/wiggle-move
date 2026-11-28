@@ -89,15 +89,14 @@ class SessionSubmission {
     'duration_ms': durationMs,
     'score': score,
     'sets': sets,
+    // When the play happened: a play uploaded later (offline queue) keeps its
+    // own time on the server.
+    'played_at': playedAt.toUtc().toIso8601String(),
     'results': [for (final r in results) r.toPayload()],
   };
 
   /// Local storage shape (pending queue): the payload plus owner and time.
-  Map<String, Object?> toJson() => {
-    ...toPayload(),
-    'user_id': userId,
-    'played_at': playedAt.toUtc().toIso8601String(),
-  };
+  Map<String, Object?> toJson() => {...toPayload(), 'user_id': userId};
 
   static SessionSubmission? tryFromJson(Object? json) {
     if (json is! Map) return null;

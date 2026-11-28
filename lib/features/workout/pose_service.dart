@@ -6,11 +6,13 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../shared/pose/pose_math.dart';
 
-/// True where ML Kit pose detection exists.
+/// True where a pose source exists: ML Kit on Android/iOS, the pure-Dart
+/// model engine on Windows (`DesktopCamera`).
 bool get poseDetectionSupported =>
     !kIsWeb &&
     (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.windows);
 
 /// Camera format ML Kit expects on this platform.
 ImageFormatGroup get poseImageFormat =>

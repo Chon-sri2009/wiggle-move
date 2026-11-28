@@ -39,6 +39,12 @@ export const REPS_OVERSHOOT = 3;
 /** Raw request body cap (bytes), enforced by index.ts before JSON.parse. */
 export const MAX_BODY_BYTES = 32 * 1024;
 
+/** A reported play time may be at most this old (the offline queue's reach). */
+export const MAX_PLAY_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Clock skew allowed for a play time slightly in the future. */
+export const PLAY_TIME_SKEW_MS = 5 * 60 * 1000;
+
 /** Sessions allowed per user per rolling hour. */
 export const RATE_LIMIT_PER_HOUR = 30;
 
@@ -52,6 +58,7 @@ export const ERR = Object.freeze({
   routineMismatch: 'routine_mismatch',
   invalidNonce: 'invalid_nonce',
   invalidDuration: 'invalid_duration',
+  invalidPlayedAt: 'invalid_played_at',
   implausibleDuration: 'implausible_duration',
   invalidScore: 'invalid_score',
   invalidSets: 'invalid_sets',
@@ -84,6 +91,8 @@ export type Submission = {
   duration_ms: number;
   score: number;
   sets: number;
+  /** ISO time the play happened; null = the server's upload time. */
+  played_at: string | null;
   results: MoveResultInput[];
 };
 
@@ -142,7 +151,11 @@ export function isValidNonce(v: unknown): v is string {
   return typeof v === 'string' && UUID_RE.test(v);
 }
 
-export function validateSubmission(payload: unknown, routine: RoutineInfo): ValidationResult {
+export function validateSubmission(
+  payload: unknown,
+  routine: RoutineInfo,
+  now: number = Date.now(),
+): ValidationResult {
   if (
     !Number.isInteger(routine.moveCount) || routine.moveCount < 1 ||
     !Number.isInteger(routine.durationMs) || routine.durationMs < 1 ||
@@ -154,7 +167,11 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
     return fail(ERR.invalidRoutine);
   }
   if (!isPlainObject(payload)) return fail(ERR.invalidPayload);
-  const keys = keyError(payload, TOP_KEYS);
+  // played_at is optional so an older app (which never sends it) still works.
+  const keys = keyError(
+    payload,
+    'played_at' in payload ? [...TOP_KEYS, 'played_at'] : TOP_KEYS,
+  );
   if (keys) return fail(keys);
 
   const { routine_id, client_nonce, duration_ms, score, sets, results } = payload;
@@ -163,6 +180,21 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
   if (routine_id !== routine.id) return fail(ERR.routineMismatch);
 
   if (!isValidNonce(client_nonce)) return fail(ERR.invalidNonce);
+
+  let playedAt: string | null = null;
+  if ('played_at' in payload) {
+    const raw = payload.played_at;
+    const t = typeof raw === 'string' ? Date.parse(raw) : NaN;
+    if (
+      !Number.isFinite(t) ||
+      t > now + PLAY_TIME_SKEW_MS ||
+      t < now - MAX_PLAY_AGE_MS
+    ) {
+      return fail(ERR.invalidPlayedAt);
+    }
+    // Never later than the server's own clock.
+    playedAt = new Date(Math.min(t, now)).toISOString();
+  }
 
   if (!Number.isInteger(duration_ms)) return fail(ERR.invalidDuration);
   const d = duration_ms as number;
@@ -248,6 +280,7 @@ export function validateSubmission(payload: unknown, routine: RoutineInfo): Vali
       duration_ms: d,
       score: score as number,
       sets: sets as number,
+      played_at: playedAt,
       results: out,
     },
   };

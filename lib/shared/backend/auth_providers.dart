@@ -37,3 +37,25 @@ class AuthUserNotifier extends Notifier<AppUser?> {
 final authUserProvider = NotifierProvider<AuthUserNotifier, AppUser?>(
   AuthUserNotifier.new,
 );
+
+/// True from the moment a password-reset link is opened until the new
+/// password is saved; the router keeps the user on the reset screen
+/// meanwhile instead of sending a "signed in" user home.
+class PasswordRecoveryNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final sub = ref
+        .watch(authRepositoryProvider)
+        .passwordRecovery
+        .listen((_) => state = true, onError: (Object _) {});
+    ref.onDispose(sub.cancel);
+    return false;
+  }
+
+  void finish() => state = false;
+}
+
+final passwordRecoveryProvider =
+    NotifierProvider<PasswordRecoveryNotifier, bool>(
+      PasswordRecoveryNotifier.new,
+    );

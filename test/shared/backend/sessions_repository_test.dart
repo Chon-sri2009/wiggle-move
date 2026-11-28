@@ -141,6 +141,7 @@ void main() {
         'duration_ms',
         'score',
         'sets',
+        'played_at',
         'results',
       });
       expect(p['routine_id'], 'mia-pop');

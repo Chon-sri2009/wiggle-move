@@ -13,6 +13,8 @@ import '../profile/profile_store.dart';
 import '../trainers/content_gate.dart';
 import '../trainers/personalization.dart';
 import '../trainers/trainers_provider.dart';
+import '../../shared/widgets/content_width.dart';
+import '../../shared/l10n/app_language.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -32,70 +34,65 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            tooltip: 'History',
-            icon: const Icon(Icons.history),
-            onPressed: () => context.push('/history'),
-          ),
-          IconButton(
-            tooltip: 'Leaderboard',
-            icon: const Icon(Icons.emoji_events),
-            onPressed: () => context.push('/leaderboard'),
-          ),
-          IconButton(
-            tooltip: 'Profile',
-            icon: const Icon(Icons.account_circle, size: 28),
+            tooltip: context.tr('Profile'),
+            icon: const Icon(Icons.account_circle_outlined),
             onPressed: () => context.push('/profile'),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(trainersProvider.notifier).refresh(),
-        child: ListView(
-          // Pull-to-refresh must work even when the list is short.
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              'Hi, $name',
-              style: theme.textTheme.displaySmall?.copyWith(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              'Choose your trainer',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...switch (content) {
-              AsyncValue(:final value?) => [
-                if (value.isStale) const _StaleNote(),
-                for (final trainer in rankTrainers(value.trainers, profile))
-                  _TrainerCard(
-                    trainer: trainer,
-                    recommended: trainerRecommended(trainer, profile),
-                  ),
-              ],
-              AsyncValue(:final error?) => [
-                ErrorView(
-                  message: contentErrorMessage(error),
-                  onRetry: () => ref.read(trainersProvider.notifier).refresh(),
+      body: ContentWidth(
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(trainersProvider.notifier).refresh(),
+          child: ListView(
+            // Pull-to-refresh must work even when the list is short.
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                context.tr('Hello, {name}', {'name': name}),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: AppColors.accentDeep,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-              _ => [const LoadingView()],
-            },
-          ],
+              ),
+              Text(
+                context.tr('Choose your trainer!'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...switch (content) {
+                AsyncValue(:final value?) => [
+                  if (value.isStale) const _StaleNote(),
+                  for (final trainer in rankTrainers(value.trainers, profile))
+                    _TrainerCard(
+                      trainer: trainer,
+                      recommended: trainerRecommended(trainer, profile),
+                    ),
+                ],
+                AsyncValue(:final error?) => [
+                  ErrorView(
+                    message: contentErrorMessage(error),
+                    onRetry: () =>
+                        ref.read(trainersProvider.notifier).refresh(),
+                  ),
+                ],
+                _ => [const LoadingView()],
+              },
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Avatar letter: first character of the last word of [name], or '?'.
+/// Avatar letter: first character of the last word of [name], ignoring any
+/// "(note)" suffix, so "Video Coach (demo)" gives "C", not "(". '?' if empty.
 String trainerInitial(String name) {
-  final words = name.trim().split(RegExp(r'\s+'));
+  final plain = name.replaceAll(RegExp(r'\([^)]*\)'), ' ').trim();
+  final words = (plain.isEmpty ? name.trim() : plain).split(RegExp(r'\s+'));
   final last = words.last;
   return last.isEmpty ? '?' : last.characters.first;
 }
@@ -150,7 +147,9 @@ class _StaleNote extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            "Couldn't update — showing saved content. Pull down to retry.",
+            context.tr(
+              'Couldn\'t update — showing saved content. Pull down to retry.',
+            ),
             style: TextStyle(color: Theme.of(context).hintColor),
           ),
         ),
@@ -179,8 +178,9 @@ class _TrainerCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          '${trainer.style} · ${trainer.routines.length} routines'
-          '${recommended ? ' · Recommended' : ''}',
+          '${trainer.style} · '
+          '${context.trCount('1 routine', '{n} routines', trainer.routines.length)}'
+          '${recommended ? context.tr(' · Recommended') : ''}',
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/trainer/${trainer.id}'),

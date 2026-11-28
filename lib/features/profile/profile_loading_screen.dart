@@ -5,6 +5,7 @@ import '../../shared/backend/auth_providers.dart';
 import '../../shared/backend/profile_repository.dart';
 import '../../shared/widgets/async_states.dart';
 import 'profile_store.dart';
+import '../../shared/l10n/app_language.dart';
 
 /// Shown at `/loading` while the signed-in user's profile loads, or with a
 /// Retry button if loading failed. The router moves on once it has loaded.
@@ -32,7 +33,7 @@ class ProfileLoadingScreen extends ConsumerWidget {
                   TextButton(
                     onPressed: () =>
                         ref.read(authRepositoryProvider).signOut().ignore(),
-                    child: const Text('Sign out'),
+                    child: Text(context.tr('Sign out')),
                   ),
                 ],
               ),

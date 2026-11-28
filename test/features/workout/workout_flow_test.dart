@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiggle_move/features/summary/summary_screen.dart';
+import 'package:wiggle_move/features/workout/form/form_feedback.dart';
 import 'package:wiggle_move/features/workout/play_clock.dart';
 import 'package:wiggle_move/features/workout/workout_camera.dart';
 import 'package:wiggle_move/features/workout/workout_cues.dart';
@@ -52,12 +53,18 @@ class _FakeCamera implements WorkoutCamera {
   Widget buildPreview() => const SizedBox.expand();
 
   @override
+  double get previewAspect => 3 / 4;
+
+  @override
   Future<void> startFrames(
     void Function(Map<Joint, double> angles) onAngles,
   ) async => listener = onAngles;
 
   @override
   Future<void> stopFrames() async => listener = null;
+
+  @override
+  final formFeedback = ValueNotifier<FormFeedback?>(null);
 
   @override
   Future<void> close() async => closed = true;

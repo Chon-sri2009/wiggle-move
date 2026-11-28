@@ -12,6 +12,21 @@ void main() {
   String? go(String loc, AsyncValue<Profile> p, {bool signedIn = true}) =>
       appRedirect(signedIn: signedIn, profile: p, location: loc);
 
+  test('opening a reset link keeps the user on /reset-password', () {
+    String? recover(String loc) => appRedirect(
+      signedIn: true,
+      profile: done,
+      location: loc,
+      recovering: true,
+    );
+    expect(recover('/'), '/reset-password');
+    expect(recover('/login'), '/reset-password');
+    expect(recover('/reset-password'), isNull);
+    // Without a reset in progress the screen is not reachable.
+    expect(go('/reset-password', done), '/');
+    expect(go('/reset-password', done, signedIn: false), '/login');
+  });
+
   test('signed out goes to login, auth pages stay', () {
     expect(go('/', done, signedIn: false), '/login');
     expect(go('/loading', loading, signedIn: false), '/login');

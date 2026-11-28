@@ -104,6 +104,13 @@ abstract class AuthRepository {
 
   Future<void> sendPasswordReset(String email);
 
+  /// Emits when the user opened a password-reset link: the app is then signed
+  /// in with a recovery session and must ask for a new password.
+  Stream<void> get passwordRecovery;
+
+  /// Sets a new password for the signed-in user.
+  Future<void> updatePassword(String password);
+
   /// Changes the name the app shows for the signed-in user.
   Future<void> updateDisplayName(String name);
 

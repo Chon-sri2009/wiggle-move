@@ -21,6 +21,8 @@ class FakeAuthRepository implements AuthRepository {
   AuthFailure? failWith;
   final resetRequests = <String>[];
   final nameUpdates = <String>[];
+  final passwordUpdates = <String>[];
+  final _recovery = StreamController<void>.broadcast();
   int deletes = 0;
   final _changes = StreamController<AppUser?>.broadcast();
 
@@ -67,6 +69,18 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> sendPasswordReset(String email) async {
     _check();
     resetRequests.add(email);
+  }
+
+  @override
+  Stream<void> get passwordRecovery => _recovery.stream;
+
+  /// Simulates opening a password-reset link.
+  void emitRecovery() => _recovery.add(null);
+
+  @override
+  Future<void> updatePassword(String password) async {
+    _check();
+    passwordUpdates.add(password);
   }
 
   @override

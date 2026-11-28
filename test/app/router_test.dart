@@ -86,7 +86,7 @@ void main() {
     final auth = FakeAuthRepository(FakeAuthRepository.ann);
     await tester.pumpWidget(await _app(auth, onboarded: true));
     await tester.pumpAndSettle();
-    expect(find.text('Hi, Ann'), findsOneWidget);
+    expect(find.text('Hello, Ann'), findsOneWidget);
   });
 
   testWidgets('login moves on when the auth stream reports a user', (
@@ -98,7 +98,7 @@ void main() {
     await _fillLogin(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Login'));
     await tester.pumpAndSettle();
-    expect(find.text('Hi, ann'), findsOneWidget);
+    expect(find.text('Hello, ann'), findsOneWidget);
   });
 
   testWidgets('sign-out returns to /login', (tester) async {
@@ -202,7 +202,7 @@ void main() {
       final auth = FakeAuthRepository(FakeAuthRepository.ann);
       await tester.pumpWidget(await _app(auth, onboarded: true));
       await tester.pumpAndSettle();
-      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Hello, Ann'), findsOneWidget);
       expect(find.text('Personalization'), findsNothing);
     });
 
@@ -218,11 +218,11 @@ void main() {
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Personalization'), findsNothing);
-      expect(find.text('Hi, Ann'), findsNothing);
+      expect(find.text('Hello, Ann'), findsNothing);
 
       repo.loadGate!.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Hello, Ann'), findsOneWidget);
     });
 
     testWidgets('load failure shows the message and retry recovers', (
@@ -240,7 +240,7 @@ void main() {
       repo.failLoad = null;
       await tester.tap(find.widgetWithText(FilledButton, 'Retry'));
       await tester.pumpAndSettle();
-      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Hello, Ann'), findsOneWidget);
     });
 
     testWidgets('completing personalization saves to the repository', (
@@ -251,7 +251,7 @@ void main() {
       await tester.pumpWidget(await _app(auth, profiles: repo));
       await tester.pumpAndSettle();
       await _personalize(tester);
-      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Hello, Ann'), findsOneWidget);
       expect(
         repo.profiles['u1'],
         const Profile(
@@ -274,7 +274,7 @@ void main() {
       await _personalize(tester);
       expect(find.text(RepositoryFailure.network), findsOneWidget);
       expect(find.text('Experience Level'), findsOneWidget);
-      expect(find.text('Hi, Ann'), findsNothing);
+      expect(find.text('Hello, Ann'), findsNothing);
       expect(repo.profiles, isEmpty);
     });
 
@@ -287,7 +287,7 @@ void main() {
       });
       await tester.pumpWidget(await _app(auth, profiles: repo));
       await tester.pumpAndSettle();
-      expect(find.text('Hi, Ann'), findsOneWidget);
+      expect(find.text('Hello, Ann'), findsOneWidget);
 
       auth.emit(null);
       await tester.pumpAndSettle();
@@ -300,7 +300,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump();
-      expect(find.text('Hi, Bob'), findsNothing);
+      expect(find.text('Hello, Bob'), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
       repo.loadGate!.complete();

@@ -34,7 +34,7 @@ class CameraFailure {
 
 const unsupportedPlatformFailure = CameraFailure(
   CameraProblem.unsupported,
-  'Pose detection runs on Android and iOS only. Open the app on a phone.',
+  'Pose detection runs on Android, iOS and Windows only. Open the app on a phone or a Windows PC.',
   canRetry: false,
 );
 

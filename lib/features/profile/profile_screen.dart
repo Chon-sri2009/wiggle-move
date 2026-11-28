@@ -14,6 +14,7 @@ import '../../shared/widgets/async_states.dart';
 import '../../shared/widgets/primary_button.dart';
 import 'profile_options.dart';
 import 'profile_store.dart';
+import '../../shared/l10n/app_language.dart';
 
 /// Edit name, avatar, goals, styles and level; sign out; delete the account.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -92,6 +93,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (!_canSave || !_form.currentState!.validate()) return;
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
+    final savedText = context.tr('Profile saved');
     try {
       if (_profileChanged) {
         final next = _edited;
@@ -100,11 +102,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
       if (_nameChanged) {
         final name = _name.text.trim();
-        await ref.read(profileRepositoryProvider).saveDisplayName(name);
+        // Auth metadata first: if the profile row (what the leaderboard
+        // shows) then fails, nothing public changed and a retry is safe.
         await ref.read(authRepositoryProvider).updateDisplayName(name);
+        await ref.read(profileRepositoryProvider).saveDisplayName(name);
         _savedName = name;
       }
-      messenger.showSnackBar(const SnackBar(content: Text('Profile saved')));
+      messenger.showSnackBar(SnackBar(content: Text(savedText)));
     } on RepositoryFailure catch (e) {
       _showError(e.message);
     } on AuthFailure catch (e) {
@@ -135,12 +139,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final email = ref.watch(authUserProvider)?.email ?? '';
     if (!ref.watch(profileProvider).hasValue) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+        appBar: AppBar(title: Text(context.tr('Profile'))),
         body: const LoadingView(),
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(context.tr('Profile'))),
       body: SafeArea(
         child: Form(
           key: _form,
@@ -177,7 +181,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: _avatar == a
-                                  ? AppColors.secondary
+                                  ? AppColors.primary
                                   : Colors.transparent,
                               width: 3,
                             ),
@@ -188,6 +192,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                 ],
               ),
+              const SizedBox(height: 24),
+              const LanguagePicker(),
               const SizedBox(height: 24),
               AppTextField(
                 controller: _name,
@@ -226,7 +232,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: _busy ? null : _signOut,
-                child: const Text('Sign out'),
+                child: Text(context.tr('Sign out')),
               ),
               TextButton(
                 style: TextButton.styleFrom(
@@ -238,7 +244,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         context: context,
                         builder: (_) => const _DeleteAccountDialog(),
                       ),
-                child: const Text('Delete account'),
+                child: Text(context.tr('Delete account')),
               ),
             ],
           ),
@@ -255,7 +261,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _section(ThemeData theme, String title) => Padding(
     padding: const EdgeInsets.only(top: 24, bottom: 8),
     child: Text(
-      title,
+      context.tr(title),
       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     ),
   );
@@ -270,7 +276,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     children: [
       for (final o in options)
         FilterChip(
-          label: Text(o.label),
+          label: Text(context.tr(o.label)),
           selected: selected.contains(o.label),
           onSelected: (_) => onTap(o.label),
         ),
@@ -314,14 +320,15 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: const Text('Delete account?'),
+      title: Text(context.tr('Delete account?')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'This permanently deletes your account, your scores and your '
-            'history. It cannot be undone.',
+          Text(
+            context.tr(
+              'This permanently deletes your account, your scores and your history. It cannot be undone.',
+            ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -332,7 +339,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.tr('Cancel')),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: scheme.error),
@@ -342,7 +349,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Delete'),
+              : Text(context.tr('Delete')),
         ),
       ],
     );

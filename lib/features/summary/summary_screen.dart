@@ -9,6 +9,8 @@ import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/primary_button.dart';
 import '../scoring/move_scorer.dart';
 import '../workout/workout_session.dart';
+import '../../shared/widgets/content_width.dart';
+import '../../shared/l10n/app_language.dart';
 
 /// Route extra for `/summary`: the play and its upload id (client nonce),
 /// null when nothing was submitted (signed out).
@@ -51,41 +53,65 @@ class SummaryScreen extends StatelessWidget {
         title: Text(fromHistory ? 'Past session' : 'Session summary'),
         automaticallyImplyLeading: fromHistory,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                Text(summary.routine.name, style: theme.textTheme.titleMedium),
-                Text(
-                  '$total',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.accent,
+      body: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            AppCard(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Text(
+                    context.tr('Results'),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                Text(_grade(total), style: theme.textTheme.titleLarge),
-                _Stats(summary),
-                if (submissionId case final id?) _UploadStatus(id),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    summary.routine.name,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    context.tr('Score :'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(
+                    '$total',
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accentDeep,
+                    ),
+                  ),
+                  Text(
+                    context.tr(_grade(total)),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  _Stats(summary),
+                  if (submissionId case final id?) _UploadStatus(id),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text('Move by move', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          for (final outcome in summary.outcomes)
-            _MoveCard(outcome, summary.routine.sets),
-          const SizedBox(height: 16),
-          PrimaryButton(
-            onPressed: () => context.go('/leaderboard'),
-            label: 'See leaderboard',
-          ),
-          TextButton(
-            onPressed: () => context.go('/'),
-            child: const Text('Back to trainers'),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              context.tr('Move by move'),
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final outcome in summary.outcomes)
+              _MoveCard(outcome, summary.routine.sets),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              onPressed: () => context.go('/leaderboard'),
+              label: 'See leaderboard',
+            ),
+            TextButton(
+              onPressed: () => context.go('/'),
+              child: Text(context.tr('Back to trainers')),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -108,11 +134,17 @@ class _Stats extends StatelessWidget {
     final kcal = summary.calories;
     final ms = summary.durationMs;
     final parts = [
-      if (summary.routine.sets > 1) '${summary.routine.sets} sets',
+      if (summary.routine.sets > 1)
+        context.tr('{n} sets', {'n': summary.routine.sets}),
       if (summary.targetReps > 0)
-        '${summary.totalReps} / ${summary.targetReps} reps',
-      if (ms != null && ms > 0) '${_minutesSeconds(ms)} active',
-      if (kcal != null && kcal > 0) '≈ $kcal kcal (estimate)',
+        context.tr('{a} / {b} reps', {
+          'a': summary.totalReps,
+          'b': summary.targetReps,
+        }),
+      if (ms != null && ms > 0)
+        context.tr('{t} active', {'t': _minutesSeconds(ms)}),
+      if (kcal != null && kcal > 0)
+        context.tr('≈ {n} kcal (estimate)', {'n': kcal}),
     ];
     if (parts.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -149,7 +181,7 @@ class _UploadStatus extends ConsumerWidget {
       SubmissionStatus.saved => (
         Icons.cloud_done_outlined,
         SummaryScreen.savedText,
-        Colors.green,
+        AppColors.success,
       ),
       SubmissionStatus.queued => (
         Icons.cloud_off_outlined,
@@ -194,9 +226,11 @@ class _MoveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final result = outcome.result;
-    final color = result.score >= 80
-        ? Colors.green
-        : (result.score >= 50 ? Colors.orange : Colors.red);
+    final (color, level) = result.score >= 80
+        ? (AppColors.success, 'Great')
+        : (result.score >= 50
+              ? (AppColors.warning, 'OK')
+              : (AppColors.danger, 'Needs work'));
     return AppCard(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -211,8 +245,11 @@ class _MoveCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '${result.score}',
-                style: theme.textTheme.titleLarge?.copyWith(color: color),
+                '${result.score} · ${context.tr(level)}',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -226,14 +263,20 @@ class _MoveCard extends StatelessWidget {
           const SizedBox(height: 8),
           if (outcome.move.rep case final rep?) ...[
             Text(
-              'Reps ${result.reps} / ${rep.target * sets}',
+              context.tr('Reps {a} / {b}', {
+                'a': result.reps,
+                'b': rep.target * sets,
+              }),
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 4),
           ],
-          Text(_feedback(result), style: theme.textTheme.bodyMedium),
+          Text(
+            context.tr(_feedback(result)),
+            style: theme.textTheme.bodyMedium,
+          ),
         ],
       ),
     );

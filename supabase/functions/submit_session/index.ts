@@ -178,6 +178,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     p_duration_ms: v.duration_ms,
     p_results: v.results,
     p_sets: v.sets,
+    p_played_at: v.played_at,
   });
   if (rpcError) {
     console.error('submit_session: submit_session_tx failed', rpcError.code);

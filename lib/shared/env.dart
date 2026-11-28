@@ -8,6 +8,10 @@ class Env {
   /// Dev/test bypass: run the local-only app without Supabase keys.
   static const offline = bool.fromEnvironment('WM_OFFLINE');
 
+  /// Live squat/lunge/jumping-jack form feedback from the trained model.
+  /// Off by default: the model is not validated on a device yet.
+  static const formCoach = bool.fromEnvironment('WM_FORM_COACH');
+
   static bool get isConfigured => hasKeys(supabaseUrl, supabaseAnonKey);
 
   /// True when both values are non-empty. Separate so it can be unit tested.

@@ -13,16 +13,22 @@ import '../shared/backend/auth_providers.dart';
 import '../shared/backend/content_models.dart';
 import '../shared/backend/profile.dart';
 import '../shared/backend/sessions_providers.dart';
+import '../shared/widgets/app_bottom_nav.dart';
 import 'theme.dart';
 
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/leaderboard/leaderboard_screen.dart';
+import '../features/search/search_screen.dart';
 import '../features/summary/summary_screen.dart';
 import '../features/trainers/content_gate.dart';
 import '../features/trainers/trainer_screen.dart';
 import '../features/trainers/trainers_provider.dart';
 import '../features/workout/workout_screen.dart';
+
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import '../shared/l10n/app_language.dart';
 
 class _NotFound extends StatelessWidget {
   const _NotFound();
@@ -36,6 +42,7 @@ class _NotFound extends StatelessWidget {
 
 const _authPaths = {'/login', '/signup'};
 const _loadingPath = '/loading';
+const _resetPath = '/reset-password';
 
 /// Where the router sends [location], or null to stay. Signed-out users go
 /// to login; while the profile is loading (or failed to load) a signed-in
@@ -45,8 +52,12 @@ String? appRedirect({
   required bool signedIn,
   required AsyncValue<Profile> profile,
   required String location,
+  bool recovering = false,
 }) {
   if (!signedIn) return _authPaths.contains(location) ? null : '/login';
+  // Opened from a password-reset email: set the new password first.
+  if (recovering) return location == _resetPath ? null : _resetPath;
+  if (location == _resetPath) return '/';
   // isLoading also covers a reload that still carries the previous value.
   if (profile.isLoading || profile.hasError) {
     return location == _loadingPath ? null : _loadingPath;
@@ -59,12 +70,39 @@ String? appRedirect({
   return null;
 }
 
+/// Bottom bar around the tab screens. Back on another tab returns to Home
+/// before it leaves the app.
+class _TabShell extends StatelessWidget {
+  const _TabShell({required this.location, required this.child});
+  final String location;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final tab = AppTab.values.firstWhere(
+      (t) => t.path == location,
+      orElse: () => AppTab.home,
+    );
+    return PopScope(
+      canPop: tab == AppTab.home,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go(AppTab.home.path);
+      },
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: AppBottomNav(current: tab),
+      ),
+    );
+  }
+}
+
 GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
   refreshListenable: refresh,
   redirect: (context, state) => appRedirect(
     signedIn: ref.read(authUserProvider) != null,
     profile: ref.read(profileProvider),
     location: state.matchedLocation,
+    recovering: ref.read(passwordRecoveryProvider),
   ),
   routes: [
     GoRoute(
@@ -73,8 +111,23 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
     ),
     GoRoute(path: '/login', builder: (c, s) => const AuthScreen(signUp: false)),
     GoRoute(path: '/signup', builder: (c, s) => const AuthScreen(signUp: true)),
+    GoRoute(path: _resetPath, builder: (c, s) => const ResetPasswordScreen()),
     GoRoute(path: '/personalize', builder: (c, s) => const PersonalizeScreen()),
-    GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+    // The four tabs share one bottom bar; deeper pages (trainer, workout,
+    // summary, profile) are pushed over it.
+    ShellRoute(
+      builder: (context, state, child) =>
+          _TabShell(location: state.matchedLocation, child: child),
+      routes: [
+        GoRoute(path: '/', builder: (c, s) => const HomeScreen()),
+        GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
+        GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
+        GoRoute(
+          path: '/leaderboard',
+          builder: (c, s) => const LeaderboardScreen(),
+        ),
+      ],
+    ),
     GoRoute(path: '/profile', builder: (c, s) => const ProfileScreen()),
     GoRoute(
       path: '/trainer/:id',
@@ -104,11 +157,6 @@ GoRouter _buildRouter(WidgetRef ref, Listenable refresh) => GoRouter(
               )
             : const _NotFound();
       },
-    ),
-    GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
-    GoRoute(
-      path: '/leaderboard',
-      builder: (context, state) => const LeaderboardScreen(),
     ),
   ],
 );
@@ -159,9 +207,18 @@ class _WiggleMoveAppState extends ConsumerState<WiggleMoveApp>
       if (next != null && next.id != prev?.id) _flushPending();
     });
     ref.listen(profileProvider, (_, _) => _refresh.value++);
+    ref.listen(passwordRecoveryProvider, (_, _) => _refresh.value++);
+    final language = ref.watch(languageProvider);
     return MaterialApp.router(
       title: 'Wiggle Move',
+      locale: language.locale,
+      supportedLocales: [for (final l in AppLanguage.values) l.locale],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) =>
+          AppLanguageScope(language: language, child: child!),
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      themeMode: ThemeMode.light, // light-only by design
       routerConfig: _router,
     );
   }

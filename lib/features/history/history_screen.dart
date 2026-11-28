@@ -9,6 +9,8 @@ import '../../shared/widgets/async_states.dart';
 import '../summary/summary_screen.dart';
 import '../trainers/trainers_provider.dart';
 import 'history_provider.dart';
+import '../../shared/widgets/content_width.dart';
+import '../../shared/l10n/app_language.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -30,30 +32,32 @@ class HistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(historyProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
-      body: history.when(
-        skipLoadingOnReload: true,
-        loading: () => const LoadingView(),
-        error: (e, _) => ErrorView(
-          message: e is RepositoryFailure
-              ? e.message
-              : RepositoryFailure.generic,
-          onRetry: () => _refresh(ref),
-        ),
-        data: (entries) => RefreshIndicator(
-          onRefresh: () => _refresh(ref),
-          child: entries.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: 120),
-                    EmptyView(message: emptyText, icon: Icons.history),
-                  ],
-                )
-              : ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: entries.length,
-                  itemBuilder: (context, i) => _EntryTile(entries[i]),
-                ),
+      appBar: AppBar(title: Text(context.tr('History'))),
+      body: ContentWidth(
+        child: history.when(
+          skipLoadingOnReload: true,
+          loading: () => const LoadingView(),
+          error: (e, _) => ErrorView(
+            message: e is RepositoryFailure
+                ? e.message
+                : RepositoryFailure.generic,
+            onRetry: () => _refresh(ref),
+          ),
+          data: (entries) => RefreshIndicator(
+            onRefresh: () => _refresh(ref),
+            child: entries.isEmpty
+                ? ListView(
+                    children: const [
+                      SizedBox(height: 120),
+                      EmptyView(message: emptyText, icon: Icons.history),
+                    ],
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: entries.length,
+                    itemBuilder: (context, i) => _EntryTile(entries[i]),
+                  ),
+          ),
         ),
       ),
     );
@@ -80,7 +84,9 @@ class _EntryTile extends ConsumerWidget {
         ref.watch(routineProvider(entry.routineId))?.name ?? entry.routineId;
     return ListTile(
       title: Text(name),
-      subtitle: Text(formatPlayedAt(entry.playedAt)),
+      subtitle: Text(
+        formatPlayedAt(entry.playedAt, language: AppLanguageScope.of(context)),
+      ),
       trailing: Text(
         '${entry.score}',
         style: Theme.of(context).textTheme.titleLarge,
@@ -105,10 +111,29 @@ const _months = [
   'Dec',
 ];
 
-/// e.g. `Nov 26, 2026 · 14:05` in the device's time zone.
-String formatPlayedAt(DateTime at) {
+const _monthsTh = [
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.',
+];
+
+/// e.g. `Nov 26, 2026 · 14:05` in the device's time zone. In Thai: `26 พ.ย.
+/// 2569 · 14:05` (Thai month names and the Buddhist-era year).
+String formatPlayedAt(DateTime at, {AppLanguage language = AppLanguage.en}) {
   final t = at.toLocal();
   final hh = t.hour.toString().padLeft(2, '0');
   final mm = t.minute.toString().padLeft(2, '0');
+  if (language == AppLanguage.th) {
+    return '${t.day} ${_monthsTh[t.month - 1]} ${t.year + 543} · $hh:$mm';
+  }
   return '${_months[t.month - 1]} ${t.day}, ${t.year} · $hh:$mm';
 }

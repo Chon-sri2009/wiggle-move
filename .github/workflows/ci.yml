@@ -37,3 +37,22 @@ jobs:
 
       - name: Edge Function tests
         run: node --test "supabase/functions/submit_session/*.test.ts"
+
+  # Runs every migration, the seed and the pgTAP tests on a real Postgres.
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,inbucket
+
+      - name: Apply migrations and seed
+        run: supabase db reset
+
+      - name: Database tests
+        run: supabase test db

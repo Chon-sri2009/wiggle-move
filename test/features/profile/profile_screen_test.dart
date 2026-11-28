@@ -163,7 +163,9 @@ void main() {
     env.profiles.failName = null;
     await _tapVisible(tester, _save());
     expect(env.profiles.names, ['Annie']);
-    expect(env.auth.nameUpdates, ['Annie']);
+    // The auth name is set first, so the failed attempt already sent it;
+    // the retry repeats it (harmless) and then saves the public row.
+    expect(env.auth.nameUpdates, ['Annie', 'Annie']);
   });
 
   testWidgets('cannot save with no goal selected', (tester) async {

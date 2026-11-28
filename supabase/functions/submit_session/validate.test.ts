@@ -2,6 +2,7 @@
 // Run: node --test supabase/functions/submit_session/   (Node >= 22.18 / 23.6)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   DEVIATION_MAX_ABS,
@@ -69,6 +70,7 @@ test('valid payload is accepted and returned normalized', () => {
       duration_ms: 10000,
       score: 70,
       sets: 1,
+      played_at: null,
       results: [
         { move_idx: 0, score: 60, reps: 0, worst_joint: 'leftElbow', deviation: -12.5 },
         { move_idx: 1, score: 70, reps: 0, worst_joint: null, deviation: null },
@@ -273,6 +275,7 @@ test('error codes are stable strings', () => {
     routineMismatch: 'routine_mismatch',
     invalidNonce: 'invalid_nonce',
     invalidDuration: 'invalid_duration',
+    invalidPlayedAt: 'invalid_played_at',
     implausibleDuration: 'implausible_duration',
     invalidScore: 'invalid_score',
     invalidSets: 'invalid_sets',
@@ -375,4 +378,47 @@ test('repTargets must match the move count and be positive integers or null', ()
   expectError(cardioPayload(), ERR.invalidRoutine, { ...CARDIO, repTargets: [0, null] });
   expectError(cardioPayload(), ERR.invalidRoutine, { ...CARDIO, sets: 0 });
   expectError(cardioPayload(), ERR.invalidRoutine, { ...CARDIO, restMs: -1 });
+});
+
+test('played_at is optional; absent means null (server time)', () => {
+  const r = validateSubmission(payload(), ROUTINE);
+  assert.equal(r.ok, true);
+  if (r.ok) assert.equal(r.value.played_at, null);
+});
+
+test('played_at: a recent past time is kept, far past and future are rejected', () => {
+  const now = Date.parse('2026-01-10T12:00:00Z');
+  const ok = validateSubmission(payload({ played_at: '2026-01-09T23:50:00Z' }), ROUTINE, now);
+  assert.equal(ok.ok, true);
+  if (ok.ok) assert.equal(ok.value.played_at, '2026-01-09T23:50:00.000Z');
+
+  for (const bad of ['2025-11-01T00:00:00Z', '2026-01-11T00:00:00Z', 'yesterday', 5, null]) {
+    const r = validateSubmission(payload({ played_at: bad }), ROUTINE, now);
+    assert.equal(r.ok, false, String(bad));
+    if (!r.ok) assert.equal(r.error, ERR.invalidPlayedAt);
+  }
+});
+
+test('played_at slightly ahead of the server clock is clamped to now', () => {
+  const now = Date.parse('2026-01-10T12:00:00Z');
+  const r = validateSubmission(payload({ played_at: '2026-01-10T12:03:00Z' }), ROUTINE, now);
+  assert.equal(r.ok, true);
+  if (r.ok) assert.equal(r.value.played_at, '2026-01-10T12:00:00.000Z');
+});
+
+// index.ts needs Deno to run, so its check order is guarded by reading the
+// source: a retry of a stored play must be answered (idempotency lookup)
+// before the rate limit can turn it into a 429, or the offline queue stalls.
+test('index.ts checks idempotency before validation and the rate limit', () => {
+  const src = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+  const at = (needle: string): number => {
+    const i = src.indexOf(needle);
+    assert.ok(i >= 0, `index.ts no longer contains: ${needle}`);
+    return i;
+  };
+  const idempotency = at("eq('client_nonce', nonce)");
+  const validate = at('validateSubmission(');
+  const rate = at("error(429, 'rate_limited')");
+  const store = at("admin.rpc('submit_session_tx'");
+  assert.ok(idempotency < validate && validate < rate && rate < store);
 });

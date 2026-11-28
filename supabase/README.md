@@ -12,6 +12,8 @@ Database schema, row level security and tests for Wiggle Move. Needs the
 | `migrations/20260101000400_submit_session.sql` | WM-10 `public.submit_session_tx(...)`: atomic, idempotent session + move_results insert (service_role only). |
 | `migrations/20260101000500_cardio.sql` | WM-39 sets/reps/cardio: `routines.category/sets/rest_ms/met`, `moves.reps/rep_*`, `sessions.sets`, `move_results.reps`; `leaderboard(..., p_category)` and `submit_session_tx(..., p_sets)` recreated (grants repeated). |
 | _deploy order_ | Apply `20260101000500_cardio.sql` and deploy the new `submit_session` **before or with** the app that sends `sets`/`reps`/`p_category`: the old validator answers `unknown_key` (a permanent 400, the play is dropped) and an unmigrated database has no `p_category`. |
+| `migrations/20260101000700_profile_limits.sql` | Audit fix: length limits on `profiles.avatar`, `goals`, `styles` (the leaderboard returns `avatar` to everyone). |
+| `migrations/20260101000800_played_at.sql` | Audit fix: `submit_session_tx(..., p_played_at)` stores when a play happened, so an offline play keeps its time. Deploy it and the new `submit_session` before or with the app. |
 | `migrations/20260101000600_trainer_photos.sql` | WM-18 `trainers.photo_path` + public `trainer-photos` Storage bucket. |
 | `functions/delete_account/` | WM-16 Edge Function: deletes the calling user from Auth (profile, sessions and results cascade). Not run. |
 | `functions/submit_session/` | WM-10 Edge Function: `index.ts` (Deno handler), `validate.ts` (pure validation), `validate.test.ts` (node tests). |
@@ -177,3 +179,24 @@ service role uploads/replaces/deletes (no write policies exist on
 - `moves.target_angles` is a JSON object of Dart `Joint.name` → degrees, e.g.
   `{"leftShoulder": 165, "rightElbow": 170}` (`MoveTarget.angles`).
 - `move_results.worst_joint` is constrained to the eight `Joint` names.
+
+## Known limits
+
+- **Scores are computed on the phone.** The server checks that a play is
+  consistent (move scores match the total, a plausible duration, a rate limit)
+  but cannot prove the player really moved, so anyone with an account can
+  submit a perfect score. To remove a suspect user's plays (run as the
+  database owner, e.g. in the SQL editor):
+
+  ```sql
+  delete from public.sessions where user_id = '<user uuid>';
+  -- or remove the account entirely: delete from auth.users where id = '<user uuid>';
+  ```
+
+- **The leaderboard scans every session on each call.** Fine up to roughly
+  100k sessions. Past that (or when a board takes more than ~300 ms), keep a
+  `best_scores(user_id, routine_id, score, achieved_at)` table updated inside
+  `submit_session_tx` and rank from it.
+- **Password-reset links** open the app through `wigglemove://reset-callback`.
+  Add that URL to Authentication > URL Configuration > Redirect URLs on the
+  hosted project (`config.toml` already lists it for local development).

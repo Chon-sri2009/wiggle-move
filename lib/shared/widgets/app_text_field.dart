@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_language.dart';
+
 /// Themed form field (fill, pill border and padding come from the theme).
 class AppTextField extends StatelessWidget {
   const AppTextField({
@@ -26,8 +28,14 @@ class AppTextField extends StatelessWidget {
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,
       obscureText: obscureText,
-      decoration: InputDecoration(hintText: hint),
-      validator: validator,
+      decoration: InputDecoration(labelText: context.tr(hint)),
+      // Validators return English; translate the message for display.
+      validator: validator == null
+          ? null
+          : (v) {
+              final message = validator!(v);
+              return message == null ? null : context.tr(message);
+            },
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_language.dart';
+
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key});
 
@@ -23,7 +25,7 @@ class EmptyView extends StatelessWidget {
             Icon(icon, size: 48),
             const SizedBox(height: 8),
           ],
-          Text(message, textAlign: TextAlign.center),
+          Text(context.tr(message), textAlign: TextAlign.center),
         ],
       ),
     );
@@ -46,7 +48,10 @@ class ErrorView extends StatelessWidget {
             Text(message, textAlign: TextAlign.center),
             if (onRetry != null) ...[
               const SizedBox(height: 16),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              FilledButton(
+                onPressed: onRetry,
+                child: Text(context.tr('Retry')),
+              ),
             ],
           ],
         ),

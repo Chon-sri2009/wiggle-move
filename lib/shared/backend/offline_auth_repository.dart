@@ -55,6 +55,12 @@ class OfflineAuthRepository implements AuthRepository {
   Future<void> sendPasswordReset(String email) async {}
 
   @override
+  Stream<void> get passwordRecovery => const Stream.empty();
+
+  @override
+  Future<void> updatePassword(String password) async {}
+
+  @override
   Future<void> updateDisplayName(String name) async {
     await _prefs.setString(_nameKey, name);
     _changes.add(currentUser);

@@ -9,7 +9,9 @@ import '../../shared/backend/auth_repository.dart';
 import '../../shared/env.dart';
 import '../../shared/widgets/app_snackbar.dart';
 import '../../shared/widgets/app_text_field.dart';
+import '../../shared/widgets/content_width.dart';
 import '../../shared/widgets/primary_button.dart';
+import '../../shared/l10n/app_language.dart';
 
 const minPasswordLength = 8;
 const maxNameLength = 40; // profiles.display_name check constraint
@@ -109,7 +111,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Center(child: WiggleLogo(size: 32)),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 24),
+                    const LanguagePicker(),
+                    const SizedBox(height: 24),
                     if (signUp) ...[
                       AppTextField(
                         controller: _name,
@@ -137,9 +141,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: _busy ? null : _forgotPassword,
-                          child: const Text(
-                            'Forgot your password?',
-                            style: TextStyle(fontSize: 12),
+                          child: Text(
+                            context.tr('Forgot your password?'),
+                            style: TextStyle(fontSize: 14),
                           ),
                         ),
                       ),
@@ -161,15 +165,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             backgroundColor: AppColors.secondary,
                             foregroundColor: AppColors.primary,
                           ),
-                          onPressed: () => _soon(context, 'Google sign-in'),
-                          icon: const Text(
-                            'G',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                          label: const Text('Continue with Google'),
+                          // Not available yet: shown disabled, not as a
+                          // button that does nothing.
+                          onPressed: null,
+                          icon: const Icon(Icons.login, size: IconSize.s),
+                          label: Text(context.tr('Continue with Google')),
                         ),
                       ),
                     ],
@@ -180,9 +180,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           style: theme.textTheme.bodySmall,
                           children: [
                             TextSpan(
-                              text: signUp
-                                  ? 'Already have an account? '
-                                  : "Don't have an account? ",
+                              text: context.tr(
+                                signUp
+                                    ? 'Already have an account? '
+                                    : "Don't have an account? ",
+                              ),
                             ),
                             WidgetSpan(
                               alignment: PlaceholderAlignment.middle,
@@ -194,9 +196,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                     vertical: 12,
                                   ),
                                   child: Text(
-                                    signUp ? 'Login' : 'Sign up',
+                                    context.tr(signUp ? 'Login' : 'Sign up'),
                                     style: theme.textTheme.bodySmall?.copyWith(
-                                      color: AppColors.accent,
+                                      color: AppColors.accentDeep,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -211,7 +213,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'Offline mode: accounts stay on this device.',
+                          context.tr(
+                            'Offline mode: accounts stay on this device.',
+                          ),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelSmall,
                         ),
@@ -224,10 +228,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         ),
       ),
     );
-  }
-
-  static void _soon(BuildContext context, String what) {
-    showAppSnackBar(context, '$what is coming soon.');
   }
 }
 
@@ -261,19 +261,16 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
       _error = null;
     });
     final messenger = ScaffoldMessenger.of(context);
+    final sentText = context.tr(
+      'If an account exists for that email, a reset link is on its way.',
+    );
     try {
       await ref
           .read(authRepositoryProvider)
           .sendPasswordReset(_email.text.trim());
       if (!mounted) return;
       Navigator.pop(context);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'If an account exists for that email, a reset link is on its way.',
-          ),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(sentText)));
     } on AuthFailure catch (e) {
       // Shown in the dialog: a snackbar would appear behind it.
       if (mounted) {
@@ -288,7 +285,7 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Reset password'),
+      title: Text(context.tr('Reset password')),
       content: Form(
         key: _form,
         child: Column(
@@ -314,7 +311,7 @@ class _ResetPasswordDialogState extends ConsumerState<_ResetPasswordDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.tr('Cancel')),
         ),
         PrimaryButton(onPressed: _send, loading: _busy, label: 'Send link'),
       ],
@@ -332,10 +329,87 @@ class _OrDivider extends StatelessWidget {
         const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text('or', style: Theme.of(context).textTheme.bodySmall),
+          child: Text(
+            context.tr('or'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
         const Expanded(child: Divider()),
       ],
+    );
+  }
+}
+
+/// Shown after the user opens a password-reset email link: sets the new
+/// password, then the router sends them on.
+class ResetPasswordScreen extends ConsumerStatefulWidget {
+  const ResetPasswordScreen({super.key});
+
+  @override
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
+  final _form = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_busy || !_form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(authRepositoryProvider).updatePassword(_password.text);
+      ref.read(passwordRecoveryProvider.notifier).finish();
+    } on AuthFailure catch (e) {
+      if (mounted) showAppSnackBar(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(context.tr('New password'))),
+      body: ContentWidth(
+        child: Form(
+          key: _form,
+          child: ListView(
+            padding: const EdgeInsets.all(Gap.l),
+            children: [
+              AppTextField(
+                controller: _password,
+                hint: 'New password',
+                obscureText: true,
+                validator: validatePassword,
+              ),
+              const SizedBox(height: Gap.m),
+              AppTextField(
+                controller: _confirm,
+                hint: 'Repeat new password',
+                obscureText: true,
+                validator: (v) =>
+                    v == _password.text ? null : "Passwords don't match",
+              ),
+              const SizedBox(height: Gap.l),
+              PrimaryButton(
+                label: 'Save password',
+                loading: _busy,
+                onPressed: _save,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
