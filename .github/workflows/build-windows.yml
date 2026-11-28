@@ -82,7 +82,20 @@ jobs:
         run: flutter pub get
 
       - name: Build Android APK (profile, offline dev mode)
-        run: flutter build apk --profile --dart-define=WM_OFFLINE=true --android-skip-build-dependency-validation
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build apk --profile --dart-define=WM_OFFLINE=true --android-skip-build-dependency-validation 2>&1 | tee android-build.log
+
+      - name: Upload failure log
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tail -n 150 android-build.log > android-build-error.txt || true
+          gh release upload windows-dev android-build-error.txt --clobber || true
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-profile.apk wiggle-move-android.apk
