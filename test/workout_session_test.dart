@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wiggle_move_app1/features/scoring/pose_math.dart';
-import 'package:wiggle_move_app1/features/trainers/trainer_data.dart';
-import 'package:wiggle_move_app1/features/workout/workout_session.dart';
+import 'package:wiggle_move/shared/pose/pose_math.dart';
+import 'package:wiggle_move/shared/backend/trainer_data.dart';
+import 'package:wiggle_move/features/workout/workout_session.dart';
 
 void main() {
-  final routine = routineById('pop-starter')!;
+  final routine = builtInTrainers.first.routines.first;
+  submissionTests();
 
   test('advances through moves by elapsed time and finishes', () {
     final s = WorkoutSession(routine);
@@ -29,9 +30,12 @@ void main() {
   });
 
   test('seed data references only valid joints and unique routine ids', () {
-    final ids = trainers.expand((t) => t.routines).map((r) => r.id).toList();
+    final ids = builtInTrainers
+        .expand((t) => t.routines)
+        .map((r) => r.id)
+        .toList();
     expect(ids.toSet().length, ids.length);
-    for (final r in trainers.expand((t) => t.routines)) {
+    for (final r in builtInTrainers.expand((t) => t.routines)) {
       for (final m in r.moves) {
         expect(m.target.angles, isNotEmpty);
         expect(m.durationMs, greaterThan(0));
@@ -41,5 +45,41 @@ void main() {
       }
     }
     expect(Joint.values, isNotEmpty);
+  });
+}
+
+void submissionTests() {
+  final routine = builtInTrainers.first.routines.first;
+
+  test('toSubmission maps the summary to the submit_session shape', () {
+    final s = WorkoutSession(routine);
+    final target = Map.of(routine.moves.first.target.angles);
+    final joint = target.keys.first;
+    target[joint] = target[joint]! + 40;
+    s.addFrame(target);
+    s.advance(routine.durationMs);
+    final summary = s.summary();
+    final sub = summary.toSubmission(
+      userId: 'u1',
+      clientNonce: 'nonce',
+      durationMs: 24123,
+      playedAt: DateTime.utc(2026),
+    );
+    expect(sub.routineId, routine.id);
+    expect(sub.score, summary.totalScore);
+    expect(sub.durationMs, 24123);
+    expect(sub.clientNonce, 'nonce');
+    expect(sub.userId, 'u1');
+    expect(sub.results.map((r) => r.moveIdx), [
+      for (var i = 0; i < routine.moves.length; i++) i,
+    ]);
+    final first = sub.results.first;
+    final result = summary.outcomes.first.result;
+    expect(first.score, result.score);
+    expect(first.worstJoint, result.worstJoint!.name);
+    expect(first.deviation, result.worstSignedDeviation);
+    // Unseen moves send explicit nulls.
+    expect(sub.results.last.worstJoint, isNull);
+    expect(sub.results.last.deviation, isNull);
   });
 }

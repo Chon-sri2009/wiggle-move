@@ -1,6 +1,6 @@
 {
-    "name": "wiggle_move_app1",
-    "short_name": "wiggle_move_app1",
+    "name": "wiggle_move",
+    "short_name": "wiggle_move",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

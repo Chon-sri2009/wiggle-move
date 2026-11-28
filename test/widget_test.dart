@@ -2,14 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:wiggle_move_app1/app/app.dart';
-import 'package:wiggle_move_app1/features/leaderboard/leaderboard_store.dart';
+import 'package:wiggle_move/app/app.dart';
+import 'package:wiggle_move/shared/prefs.dart';
+import 'package:wiggle_move/shared/backend/auth_providers.dart';
+import 'package:wiggle_move/shared/backend/content_providers.dart';
+import 'package:wiggle_move/shared/backend/history_providers.dart';
+import 'package:wiggle_move/shared/backend/leaderboard_providers.dart';
+import 'package:wiggle_move/shared/backend/offline_content_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_history_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_leaderboard_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_auth_repository.dart';
+import 'package:wiggle_move/shared/backend/offline_profile_repository.dart';
+import 'package:wiggle_move/shared/backend/profile_providers.dart';
 
 Future<Widget> _app([Map<String, Object> prefs = const {}]) async {
   SharedPreferences.setMockInitialValues(prefs);
   final instance = await SharedPreferences.getInstance();
   return ProviderScope(
-    overrides: [sharedPrefsProvider.overrideWithValue(instance)],
+    overrides: [
+      sharedPrefsProvider.overrideWithValue(instance),
+      // The WM_OFFLINE implementation: exercises the local end-to-end path.
+      authRepositoryProvider.overrideWithValue(OfflineAuthRepository(instance)),
+      profileRepositoryProvider.overrideWithValue(
+        OfflineProfileRepository(instance),
+      ),
+      contentRepositoryProvider.overrideWithValue(
+        const OfflineContentRepository(),
+      ),
+      historyRepositoryProvider.overrideWithValue(
+        OfflineHistoryRepository(instance, playerName: () => 'Ann'),
+      ),
+      leaderboardRepositoryProvider.overrideWithValue(
+        OfflineLeaderboardRepository(
+          instance,
+          playerName: () => 'Ann',
+          routineIdsIn: (_) async => const {},
+        ),
+      ),
+    ],
     child: const WiggleMoveApp(),
   );
 }
@@ -24,6 +54,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Sign up'));
     await tester.tap(find.text('Sign up'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Sign up'), findsOneWidget);
@@ -46,11 +77,47 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Password'),
-      'secret1',
+      'secret12',
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Login'));
     await tester.pumpAndSettle();
     expect(find.text('Personalization'), findsOneWidget);
+  });
+
+  testWidgets('offline sign up -> personalize -> home', (tester) async {
+    await tester.pumpWidget(await _app());
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Sign up'));
+    await tester.tap(find.text('Sign up'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Name'), 'Cy');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'cy@x.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Password'),
+      'secret12',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign up'));
+    await tester.pumpAndSettle();
+    expect(find.text('Personalization'), findsOneWidget);
+
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Burn Calories'));
+    await tester.pump();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cardio'));
+    await tester.pump();
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Beginner'));
+    await tester.pump();
+    await tester.tap(find.text('Create My Workout Plan'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hello, Cy'), findsOneWidget);
   });
 
   testWidgets('personalization flow ends on home', (tester) async {
@@ -85,7 +152,7 @@ void main() {
     await tester.tap(find.text('Create My Workout Plan'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Hi, Ann'), findsOneWidget);
+    expect(find.text('Hello, Ann'), findsOneWidget);
     expect(find.text('Coach Mia'), findsOneWidget);
   });
 
@@ -106,7 +173,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Leaderboard'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('No scores yet'), findsOneWidget);
+    expect(find.text('No scores yet — play a routine'), findsOneWidget);
+  });
+
+  testWidgets('history shows the empty state offline', (tester) async {
+    await tester.pumpWidget(await _app(_signedIn));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('History'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No plays yet'), findsOneWidget);
   });
 
   testWidgets('sign out returns to login', (tester) async {
@@ -114,27 +189,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Sign out'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);
-  });
-
-  test('rankEntries keeps best score per player and sorts descending', () {
-    LeaderboardEntry e(String n, int s, [String r = 'a']) => LeaderboardEntry(
-      playerName: n,
-      routineId: r,
-      score: s,
-      playedAt: DateTime(2026),
-    );
-    final ranked = rankEntries([
-      e('Ann', 60),
-      e('Ann', 80),
-      e('Bo', 70),
-      e('Bo', 90, 'b'),
-    ], routineId: 'a');
-    expect(ranked.map((x) => '${x.playerName}:${x.score}'), [
-      'Ann:80',
-      'Bo:70',
-    ]);
   });
 }

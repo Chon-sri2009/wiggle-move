@@ -27,7 +27,7 @@ Reference choreography (per routine) ──────────►├─► 
 - **Client:** Flutter, feature-first (`lib/features/*`), Riverpod state, go_router.
 - **Pose detection:** `google_mlkit_pose_detection`, on-device. Privacy: video never leaves the phone.
 - **Scoring (proposed):** compute joint angles (elbows, shoulders, hips, knees) from landmarks; compare to the reference angles at the matching timestamp; tolerance band → score 0–100 per move; flag the joints whose angle deviation is largest (this drives the "what went wrong" summary). Reference poses are produced offline by running the trainer video through the same detector and stored with the routine.
-- **Backend:** Supabase — Postgres + Auth + Row Level Security. Tables (initial sketch): `profiles`, `trainers`, `routines`, `sessions`, `move_results`, plus a `leaderboard` view.
+- **Backend:** Supabase — Postgres + Auth + Row Level Security. Tables (`supabase/migrations`): `profiles`, `trainers`, `routines`, `moves`, `sessions`, `move_results`; ranked scores come from the security-definer RPC `public.leaderboard(p_routine_id, p_period, p_limit)` (WM-09).
 - **Anti-cheat (later):** sanity-check submitted scores server-side (bounds, rate) — the client is not trusted.
 
 ## 4. Decisions
@@ -35,6 +35,7 @@ Reference choreography (per routine) ──────────►├─► 
 - **On-device ML Kit** over server inference — low latency, no video upload, no GPU cost. Trade-off: mobile only, and ML Kit accuracy is limited for fast or occluded movement.
 - **Supabase** over custom backend — auth, DB and RLS out of the box for a small team. Revisit if scoring must move server-side.
 - Riverpod + go_router — standard, testable, minimal boilerplate.
+- **Repository pattern for backend access** (WM-20) — each backend area is an abstract class in `lib/shared/backend/` with a Supabase implementation and an in-memory/offline one; a Riverpod provider picks by `Env` (`WM_OFFLINE` → offline), and tests override the provider with a fake.
 
 These are defaults picked at project start; change them via PR that updates this section.
 
@@ -49,7 +50,7 @@ These are defaults picked at project start; change them via PR that updates this
 8. **Polish:** onboarding, permission states, skeleton overlay, sound/haptics, store release.
 
 ### Calibration
-Target angles in `lib/features/trainers/trainer_data.dart` are estimates for a user standing front-on, whole body in frame, ~2 m from the camera. Angles are measured in the 2D image plane, so moves toward/away from the camera (squats, forward lunges) are under-measured; prefer front-plane moves or add the ML Kit z-coordinate later. To calibrate: do each pose, log the measured angles, and update the targets.
+Target angles in `lib/shared/backend/trainer_data.dart` (built-in/offline content) and `supabase/seed.sql` are estimates for a user standing front-on, whole body in frame, ~2 m from the camera. Angles are measured in the 2D image plane, so moves toward/away from the camera (squats, forward lunges) are under-measured; prefer front-plane moves or add the ML Kit z-coordinate later. To calibrate: do each pose, log the measured angles, and update the targets.
 
 ## 6. Setup for new teammates
 1. Install Flutter 3.47+ and Android Studio (Android SDK) and/or Xcode (macOS, iOS).

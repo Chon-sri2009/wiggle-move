@@ -1,0 +1,125 @@
+name: Build Windows & Android Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/wm-build-out]
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (profile, offline dev mode)
+        run: flutter build windows --profile --dart-define=WM_OFFLINE=true
+
+      - name: Package Windows bundle
+        shell: pwsh
+        run: |
+          $outDir = "build/windows/x64/runner/Profile"
+          if (-not (Test-Path "$outDir/wiggle_move.exe")) {
+            throw "wiggle_move.exe not found in $outDir"
+          }
+          Get-ChildItem $outDir
+          Compress-Archive -Path "$outDir/*" -DestinationPath "wiggle-move-windows.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiggle-move-windows
+          path: wiggle-move-windows.zip
+          retention-days: 14
+
+      - name: Publish dev pre-release asset
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="windows-dev"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" wiggle-move-windows.zip --clobber
+          else
+            gh release create "$TAG" wiggle-move-windows.zip \
+              --prerelease \
+              --target "${{ github.sha }}" \
+              --title "Dev Builds (Windows + Android Offline Mode)" \
+              --notes "Auto-built Windows profile bundle and Android APK with WM_OFFLINE=true from commit ${{ github.sha }}."
+          fi
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (profile, offline dev mode)
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build apk --profile --dart-define=WM_OFFLINE=true --android-skip-build-dependency-validation 2>&1 | tee android-build.log
+
+      - name: Upload failure log
+        if: failure()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tail -n 150 android-build.log > android-build-error.txt || true
+          gh release upload windows-dev android-build-error.txt --clobber || true
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-profile.apk wiggle-move-android.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiggle-move-android
+          path: wiggle-move-android.apk
+          retention-days: 14
+
+      - name: Publish Android APK to dev pre-release
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="windows-dev"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" wiggle-move-android.apk --clobber
+          else
+            gh release create "$TAG" wiggle-move-android.apk \
+              --prerelease \
+              --target "${{ github.sha }}" \
+              --title "Dev Builds (Windows + Android Offline Mode)" \
+              --notes "Auto-built Windows profile bundle and Android APK with WM_OFFLINE=true from commit ${{ github.sha }}."
+          fi

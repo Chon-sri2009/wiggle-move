@@ -27,10 +27,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"wiggle_move_app1", origin, size)) {
+  if (!window.Create(L"wiggle_move", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
+
+  // Keep the display awake while the app is open (released on exit).
+  ::SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED |
+                            ES_SYSTEM_REQUIRED);
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
@@ -38,6 +42,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
+  ::SetThreadExecutionState(ES_CONTINUOUS);
   ::CoUninitialize();
   return EXIT_SUCCESS;
 }

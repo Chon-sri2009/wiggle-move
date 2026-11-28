@@ -1,10 +1,4 @@
-import 'pose_math.dart';
-
-/// Target joint angles (degrees) the user should hold for a move.
-class MoveTarget {
-  const MoveTarget(this.angles);
-  final Map<Joint, double> angles;
-}
+import '../../shared/pose/pose_math.dart';
 
 class MoveResult {
   const MoveResult({
@@ -12,10 +6,14 @@ class MoveResult {
     required this.frames,
     this.worstJoint,
     this.worstSignedDeviation,
+    this.reps = 0,
   });
 
   /// 0–100.
   final int score;
+
+  /// Reps counted (0 for timed poses). Summed over sets for a whole move.
+  final int reps;
 
   /// Number of camera frames that contributed.
   final int frames;
@@ -41,22 +39,44 @@ class MoveScorer {
   static const falloffDeg = 45.0;
 
   final MoveTarget target;
+
+  /// The joint furthest out of tolerance in the last judged frame (null if
+  /// none), and by how much (measured - target).
+  Joint? lastWorst;
+  double lastWorstSigned = 0;
   final List<double> _frameScores = [];
   final Map<Joint, List<double>> _signedDeviations = {};
 
   /// Scores one frame (0–1) or returns null if too few target joints were
   /// visible to judge.
-  double? addFrame(Map<Joint, double> measured) {
-    final visible = target.angles.keys.where(measured.containsKey).toList();
-    if (visible.length * 2 < target.angles.length || visible.isEmpty) {
+  ///
+  /// [against] replaces the move's own target for this frame (a trainer video
+  /// gives a different target at every moment). [tolerance] and [falloff]
+  /// optionally override the default angle tolerances (useful for 2D video
+  /// follow-along where camera perspective differs slightly).
+  double? addFrame(
+    Map<Joint, double> measured, {
+    MoveTarget? against,
+    double tolerance = toleranceDeg,
+    double falloff = falloffDeg,
+  }) {
+    final goal = against ?? target;
+    final visible = goal.angles.keys.where(measured.containsKey).toList();
+    if (visible.length * 2 < goal.angles.length || visible.isEmpty) {
       return null;
     }
 
     var sum = 0.0;
+    lastWorst = null;
+    lastWorstSigned = 0;
     for (final joint in visible) {
-      final signed = measured[joint]! - target.angles[joint]!;
+      final signed = measured[joint]! - goal.angles[joint]!;
       _signedDeviations.putIfAbsent(joint, () => []).add(signed);
-      sum += _jointScore(signed.abs());
+      sum += _jointScore(signed.abs(), tolerance: tolerance, falloff: falloff);
+      if (signed.abs() > tolerance && signed.abs() > lastWorstSigned.abs()) {
+        lastWorst = joint;
+        lastWorstSigned = signed;
+      }
     }
     final frameScore = sum / visible.length;
     _frameScores.add(frameScore);
@@ -89,8 +109,12 @@ class MoveScorer {
     );
   }
 
-  static double _jointScore(double deviation) {
-    if (deviation <= toleranceDeg) return 1;
-    return (1 - (deviation - toleranceDeg) / falloffDeg).clamp(0.0, 1.0);
+  static double _jointScore(
+    double deviation, {
+    double tolerance = toleranceDeg,
+    double falloff = falloffDeg,
+  }) {
+    if (deviation <= tolerance) return 1;
+    return (1 - (deviation - tolerance) / falloff).clamp(0.0, 1.0);
   }
 }

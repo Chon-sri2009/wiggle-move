@@ -1,0 +1,14 @@
+[
+ "Idle",
+ "No_Person",
+ "Squat_Correct",
+ "Squat_Wrong_Back",
+ "Squat_Wrong_Shallow",
+ "Squat_Wrong_Knee",
+ "Lunge_Correct",
+ "Lunge_Wrong_Knee",
+ "Lunge_Wrong_Back",
+ "Jack_Down",
+ "Jack_Correct_Up",
+ "Jack_Wrong_LowArm"
+]

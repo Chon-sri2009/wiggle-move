@@ -3,36 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
+import '../../shared/backend/profile_repository.dart';
+import '../../shared/widgets/app_snackbar.dart';
+import '../../shared/widgets/primary_button.dart';
+import 'profile_options.dart';
 import 'profile_store.dart';
-
-class _Option {
-  const _Option(this.label, this.icon, [this.subtitle]);
-  final String label;
-  final IconData icon;
-  final String? subtitle;
-}
-
-const _goals = [
-  _Option('Burn Calories', Icons.local_fire_department),
-  _Option('Build Strength', Icons.front_hand),
-  _Option('Improve Fitness', Icons.monitor_heart),
-  _Option('Improve Flexibility', Icons.directions_run),
-  _Option('Weight Management', Icons.monitor_weight),
-  _Option('Stay Healthy', Icons.health_and_safety),
-];
-
-const _styles = [
-  _Option('Dance Workout', Icons.accessibility_new),
-  _Option('Cardio', Icons.favorite),
-  _Option('Bodyweight', Icons.fitness_center),
-  _Option('Stretching', Icons.eco),
-];
-
-const _levels = [
-  _Option('Beginner', Icons.child_care, "I'm just getting started."),
-  _Option('Intermediate', Icons.accessibility_new, 'I work out occasionally.'),
-  _Option('Advanced', Icons.person, 'I know various workout techniques.'),
-];
+import '../../shared/l10n/app_language.dart';
 
 /// Figma "Personalization" flow: intro, then 01 goal, 02 style, 03 level.
 class PersonalizeScreen extends ConsumerStatefulWidget {
@@ -47,6 +23,7 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
   final _goalSel = <String>{};
   final _styleSel = <String>{};
   String? _level;
+  bool _saving = false;
 
   bool get _canContinue => switch (_step) {
     1 => _goalSel.isNotEmpty,
@@ -60,13 +37,23 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
       setState(() => _step++);
       return;
     }
-    await ref
-        .read(profileProvider.notifier)
-        .complete(
-          goals: _goalSel.toList(),
-          styles: _styleSel.toList(),
-          level: _level!,
-        );
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(profileProvider.notifier)
+          .complete(
+            goals: _goalSel.toList(),
+            styles: _styleSel.toList(),
+            level: _level!,
+          );
+    } on RepositoryFailure catch (e) {
+      // Stay on this step so the user can try again.
+      if (mounted) {
+        setState(() => _saving = false);
+        showAppSnackBar(context, e.message, isError: true);
+      }
+      return;
+    }
     if (mounted) context.go('/');
   }
 
@@ -102,57 +89,67 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
               children: [
                 if (_step == 0)
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Personalization',
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            color: AppColors.accent,
-                            fontWeight: FontWeight.w600,
+                    // Centered, but scrolls when large text does not fit.
+                    child: LayoutBuilder(
+                      builder: (context, box) => SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: box.maxHeight),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.tr('Personalization'),
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                  color: AppColors.accentDeep,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                context.tr('Let\'s make it personal!'),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                context.tr(
+                                  'Tell us a little about yourself so we can create a workout experience that fits you.',
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          "Let's make it personal!",
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Tell us a little about yourself so we can create a '
-                          'workout experience that fits you.',
-                        ),
-                      ],
+                      ),
                     ),
                   )
                 else ...[
                   Text(
                     number,
                     style: theme.textTheme.displaySmall?.copyWith(
-                      color: AppColors.accent,
+                      color: AppColors.accentDeep,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    title,
+                    context.tr(title),
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(subtitle, style: theme.textTheme.bodySmall),
+                  Text(context.tr(subtitle), style: theme.textTheme.bodySmall),
                   const SizedBox(height: 20),
                   Expanded(child: SingleChildScrollView(child: _stepBody())),
                 ],
                 Center(
-                  child: FilledButton(
+                  child: PrimaryButton(
                     onPressed: _canContinue ? _next : null,
-                    child: Text(switch (_step) {
+                    loading: _saving,
+                    label: switch (_step) {
                       0 => 'Start',
                       3 => 'Create My Workout Plan',
                       _ => 'Next',
-                    }),
+                    },
                   ),
                 ),
               ],
@@ -165,20 +162,20 @@ class _PersonalizeScreenState extends ConsumerState<PersonalizeScreen> {
 
   Widget _stepBody() => switch (_step) {
     1 => _Grid(
-      options: _goals,
+      options: goalOptions,
       columns: 3,
       selected: _goalSel,
       onTap: (v) => _toggle(_goalSel, v),
     ),
     2 => _Grid(
-      options: _styles,
+      options: styleOptions,
       columns: 2,
       selected: _styleSel,
       onTap: (v) => _toggle(_styleSel, v),
     ),
     _ => Column(
       children: [
-        for (final o in _levels)
+        for (final o in levelOptions)
           _LevelRow(
             option: o,
             selected: _level == o.label,
@@ -196,26 +193,50 @@ class _Grid extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final List<_Option> options;
+  final List<ProfileOption> options;
   final int columns;
   final Set<String> selected;
   final ValueChanged<String> onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: columns,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: columns == 3 ? 0.85 : 1.2,
+    // Larger system text needs wider tiles: a label such as "Management"
+    // must not be cut mid-word, so use fewer columns instead.
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final width = MediaQuery.sizeOf(context).width;
+    final cols = scale > 1.5
+        ? 1
+        : (scale > 1.15 || width < 340)
+        ? columns.clamp(1, 2)
+        : columns;
+    // Rows sized by their tallest tile (a fixed aspect ratio overflowed when a
+    // label wrapped to a second line).
+    return Column(
       children: [
-        for (final o in options)
-          _Tile(
-            option: o,
-            selected: selected.contains(o.label),
-            onTap: () => onTap(o.label),
+        for (var i = 0; i < options.length; i += cols)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: i + cols < options.length ? 12 : 0,
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var j = i; j < i + cols; j++) ...[
+                    if (j > i) const SizedBox(width: 12),
+                    Expanded(
+                      child: j < options.length
+                          ? _Tile(
+                              option: options[j],
+                              selected: selected.contains(options[j].label),
+                              onTap: () => onTap(options[j].label),
+                            )
+                          : const SizedBox(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
       ],
     );
@@ -226,7 +247,7 @@ BoxDecoration _tileDecoration(bool selected, double radius) => BoxDecoration(
   color: AppColors.field,
   borderRadius: BorderRadius.circular(radius),
   border: Border.all(
-    color: selected ? AppColors.secondary : Colors.transparent,
+    color: selected ? AppColors.primary : Colors.transparent,
     width: 3,
   ),
 );
@@ -237,7 +258,7 @@ class _Tile extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _Option option;
+  final ProfileOption option;
   final bool selected;
   final VoidCallback onTap;
 
@@ -246,27 +267,36 @@ class _Tile extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: option.label,
+      label: context.tr(option.label),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Ink(
           decoration: _tileDecoration(selected, 16),
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(option.icon, size: 40, color: AppColors.secondary),
-              const SizedBox(height: 6),
-              Text(
-                option.label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 88),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    selected ? Icons.check_circle : option.icon,
+                    size: IconSize.xl,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.tr(option.label),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -280,7 +310,7 @@ class _LevelRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final _Option option;
+  final ProfileOption option;
   final bool selected;
   final VoidCallback onTap;
 
@@ -291,7 +321,7 @@ class _LevelRow extends StatelessWidget {
       child: Semantics(
         button: true,
         selected: selected,
-        label: '${option.label}. ${option.subtitle}',
+        label: '${context.tr(option.label)}. ${context.tr(option.subtitle!)}',
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
@@ -300,19 +330,23 @@ class _LevelRow extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                Icon(option.icon, size: 32, color: AppColors.secondary),
+                Icon(
+                  selected ? Icons.check_circle : option.icon,
+                  size: IconSize.l,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        option.label,
+                        context.tr(option.label),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       Text(
-                        option.subtitle!,
-                        style: const TextStyle(fontSize: 12),
+                        context.tr(option.subtitle!),
+                        style: const TextStyle(fontSize: 14),
                       ),
                     ],
                   ),
