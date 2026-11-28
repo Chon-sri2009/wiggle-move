@@ -1,0 +1,63 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/wm-build-out]
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (profile, offline dev mode)
+        run: flutter build windows --profile --dart-define=WM_OFFLINE=true
+
+      - name: Package Windows bundle
+        shell: pwsh
+        run: |
+          $outDir = "build/windows/x64/runner/Profile"
+          if (-not (Test-Path "$outDir/wiggle_move.exe")) {
+            throw "wiggle_move.exe not found in $outDir"
+          }
+          Get-ChildItem $outDir
+          Compress-Archive -Path "$outDir/*" -DestinationPath "wiggle-move-windows.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiggle-move-windows
+          path: wiggle-move-windows.zip
+          retention-days: 14
+
+      - name: Publish dev pre-release asset
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="windows-dev"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" wiggle-move-windows.zip --clobber
+          else
+            gh release create "$TAG" wiggle-move-windows.zip \
+              --prerelease \
+              --target "${{ github.sha }}" \
+              --title "Windows Dev Build (Offline Mode)" \
+              --notes "Auto-built Windows profile bundle with WM_OFFLINE=true from commit ${{ github.sha }}."
+          fi
