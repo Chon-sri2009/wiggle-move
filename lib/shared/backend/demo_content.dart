@@ -9,9 +9,9 @@ import 'content_models.dart';
 /// Not part of `builtInTrainers`, so it is not in `supabase/seed.sql`.
 ///
 /// The target below is only the fallback for frames the video timeline cannot
-/// judge. The move lasts as long as the clip (3 min 10 s).
+/// judge. The move lasts as long as the trimmed clip (2 min 47 s).
 const demoRoutineId = 'video-squat-demo';
-const squatVideoDurationMs = 189720;
+const squatVideoDurationMs = 167400;
 
 /// The 33-minute full-body cardio workout (the team's own video). The move
 /// lasts as long as the clip; the trainer's pose at each moment comes from

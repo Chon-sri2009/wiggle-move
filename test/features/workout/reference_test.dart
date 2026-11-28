@@ -19,8 +19,8 @@ void main() {
   group('ReferenceClip', () {
     test('loads the squat timeline', () {
       final clip = _clip();
-      expect(clip.sampleCount, 949);
-      expect(clip.seconds, closeTo(189.72, 0.05));
+      expect(clip.sampleCount, 838);
+      expect(clip.seconds, closeTo(167.4, 0.05));
     });
 
     test('a user matching the trainer is judged against the same pose', () {
